@@ -12,24 +12,25 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading) {
-      if (user && userData) {
-        if (userData.tipo === 'super_adm') {
-          router.replace('/super-admin');
-        } else if (userData.tipo === 'adm_evento') {
-          router.replace('/dashboard');
-        } else {
-          // Default redirect for 'usuario' or other types
-          router.replace('/events');
-        }
-      } else if (user && !userData) {
-        // Authenticated user without a profile is an invalid state.
-        // Log them out to prevent a redirect loop.
-        signOut(auth);
+    if (loading) {
+      return; // Wait until auth state is loaded
+    }
+
+    if (user && userData) {
+      if (userData.tipo === 'super_adm') {
+        router.replace('/super-admin');
+      } else if (userData.tipo === 'adm_evento') {
+        router.replace('/dashboard');
+      } else {
+        // Invalid role for this app, sign out and redirect to login
+        signOut(auth).then(() => router.replace('/login'));
       }
-      else {
-        router.replace('/login');
-      }
+    } else if (user && !userData) {
+      // Authenticated user without a profile is an invalid state.
+      // Sign them out and redirect to login to prevent loops.
+      signOut(auth).then(() => router.replace('/login'));
+    } else { // !user
+      router.replace('/login');
     }
   }, [user, userData, loading, router]);
 

@@ -43,13 +43,15 @@ export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const { user, userData, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
+  // If user is authenticated, redirect them to the root page.
+  // The root page will handle logic for routing to the correct dashboard.
   useEffect(() => {
-    if (!authLoading && user && userData) {
+    if (!authLoading && user) {
       router.replace('/');
     }
-  }, [user, userData, authLoading, router]);
+  }, [user, authLoading, router]);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -63,11 +65,11 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       await signInWithEmailAndPassword(auth, data.email, data.password);
+      // On success, the auth state will change, and the useEffect above will handle the redirect.
       toast({
         title: 'Login bem-sucedido!',
         description: 'Redirecionando para o seu painel...',
       });
-      // The redirection is now handled by the useEffect hook
     } catch (error: any) {
       console.error(error);
       toast({
@@ -75,10 +77,20 @@ export default function LoginPage() {
         title: 'Erro no login',
         description: 'Email ou senha incorretos. Por favor, tente novamente.',
       });
-      setIsLoading(false);
+      setIsLoading(false); // Reset loading state on error
     }
   };
 
+  // While auth state is loading, or if user is logged in and we are waiting for redirect, show a full page loader.
+  if (authLoading || user) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Only render the form if the user is not logged in and auth is not loading.
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-background px-4">
       <div className="w-full max-w-md space-y-6">
