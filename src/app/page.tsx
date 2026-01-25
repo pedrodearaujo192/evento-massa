@@ -4,6 +4,8 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { Loader2 } from 'lucide-react';
+import { signOut } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 export default function Home() {
   const { user, userData, loading } = useAuth();
@@ -20,7 +22,12 @@ export default function Home() {
           // Default redirect for 'usuario' or other types
           router.replace('/events');
         }
-      } else {
+      } else if (user && !userData) {
+        // Authenticated user without a profile is an invalid state.
+        // Log them out to prevent a redirect loop.
+        signOut(auth);
+      }
+      else {
         router.replace('/login');
       }
     }

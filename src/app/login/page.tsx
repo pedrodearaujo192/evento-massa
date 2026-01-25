@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useForm } from 'react-hook-form';
@@ -30,6 +30,7 @@ import { Loader2 } from 'lucide-react';
 import { Icons } from '@/components/icons';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ShieldAlert } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Por favor, insira um email válido.' }),
@@ -42,6 +43,13 @@ export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const { user, userData, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    if (!authLoading && user && userData) {
+      router.replace('/');
+    }
+  }, [user, userData, authLoading, router]);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -59,7 +67,7 @@ export default function LoginPage() {
         title: 'Login bem-sucedido!',
         description: 'Redirecionando para o seu painel...',
       });
-      router.push('/'); // Redirect to home, which will handle role-based redirection
+      // The redirection is now handled by the useEffect hook
     } catch (error: any) {
       console.error(error);
       toast({
