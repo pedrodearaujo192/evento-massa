@@ -167,54 +167,6 @@ export default function NewEventPage() {
     }
   };
 
-  const handleTestUpload = async () => {
-    if (!user?.uid) {
-      toast({
-        variant: 'destructive',
-        title: 'Sessão inválida',
-        description: 'Faça login novamente para testar o upload.',
-      });
-      return;
-    }
-
-    if (!imageFile) {
-      toast({
-        variant: 'destructive',
-        title: 'Nenhuma imagem selecionada',
-        description: 'Por favor, selecione uma imagem para o teste.',
-      });
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      console.log('Iniciando UPLOAD DE TESTE...');
-      const imagePath = `testes/${user.uid}/${Date.now()}_${imageFile.name}`;
-      const imageStorageRef = ref(storage, imagePath);
-
-      await uploadBytes(imageStorageRef, imageFile);
-      const imageUrl = await getDownloadURL(imageStorageRef);
-
-      console.log('Upload de teste concluído. URL:', imageUrl);
-      toast({
-        title: 'Upload de teste bem-sucedido!',
-        description: `URL: ${imageUrl}`,
-      });
-    } catch (error: any) {
-      console.error('ERRO NO UPLOAD DE TESTE:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Erro no upload de teste',
-        description:
-          error.message ||
-          'Ocorreu uma falha desconhecida. Verifique as regras do Firebase e o console do navegador para mais detalhes.',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -389,15 +341,6 @@ export default function NewEventPage() {
             </div>
           </div>
           <div className="flex justify-end gap-4">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handleTestUpload}
-              disabled={isLoading}
-            >
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Testar Upload de Imagem
-            </Button>
             <Button type="submit" size="lg" disabled={isLoading}>
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Criar Evento
