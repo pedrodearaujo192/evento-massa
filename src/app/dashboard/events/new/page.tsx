@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
@@ -89,9 +89,9 @@ export default function NewEventPage() {
   const onSubmit = async (data: EventFormValues) => {
     if (!user?.uid) {
       toast({
-        variant: 'destructive',
-        title: 'Sessão inválida',
-        description: 'Faça login novamente para continuar.',
+        variant: "destructive",
+        title: "Sessão inválida",
+        description: "Faça login novamente para continuar.",
       });
       console.error("Tentativa de envio sem user.uid. User:", user);
       return;
@@ -99,9 +99,9 @@ export default function NewEventPage() {
   
     if (!imageFile) {
       toast({
-        variant: 'destructive',
-        title: 'Imagem obrigatória',
-        description: 'Por favor, selecione uma imagem para o evento.',
+        variant: "destructive",
+        title: "Imagem obrigatória",
+        description: "Por favor, selecione uma imagem para o evento.",
       });
       return;
     }
@@ -111,20 +111,6 @@ export default function NewEventPage() {
     try {
       console.log("USER COMPLETO:", user);
       console.log("UID:", user?.uid);
-
-      console.log("Arquivo:", imageFile);
-      console.log("Tipo:", imageFile.type);
-      console.log("Tamanho:", imageFile.size);
-
-      console.log("Iniciando upload da imagem...");
-      const imagePath = `eventos/${user.uid}/${Date.now()}_${imageFile.name}`;
-      const imageRef = ref(storage, imagePath);
-  
-      const uploadSnapshot = await uploadBytes(imageRef, imageFile);
-      console.log('Upload da imagem concluído.');
-  
-      const imageUrl = await getDownloadURL(uploadSnapshot.ref);
-      console.log('URL da imagem obtida:', imageUrl);
   
       const eventData = {
         titulo: data.titulo,
@@ -133,32 +119,48 @@ export default function NewEventPage() {
         data: data.data,
         local: data.local,
         preco: Number(data.preco),
-        imagem_url: imageUrl,
+        imagem_url: "", // Temporarily empty
         id_criador: user.uid,
         criadoEm: serverTimestamp(),
-        status: 'ativo',
+        status: "ativo",
       };
   
-      console.log('Salvando dados do evento no Firestore:', eventData);
+      console.log("Criando documento do evento no Firestore (sem imagem):", eventData);
+      const eventRef = await addDoc(collection(db, "eventos"), eventData);
+      console.log("Documento do evento criado com ID:", eventRef.id);
   
-      await addDoc(collection(db, 'eventos'), eventData);
+      console.log("Arquivo da imagem:", imageFile);
+      console.log("Tipo:", imageFile.type);
+      console.log("Tamanho:", imageFile.size);
+  
+      console.log("Iniciando upload da imagem...");
+      const imagePath = `eventos/${user.uid}/${eventRef.id}/capa.jpg`;
+      const imageStorageRef = ref(storage, imagePath);
+  
+      await uploadBytes(imageStorageRef, imageFile);
+      const imageUrl = await getDownloadURL(imageStorageRef);
+      console.log("Upload da imagem concluído. URL:", imageUrl);
+  
+      console.log("Atualizando documento do evento com a URL da imagem...");
+      await updateDoc(eventRef, { imagem_url: imageUrl });
+      console.log("Documento do evento atualizado com sucesso.");
   
       toast({
-        title: 'Evento criado com sucesso!',
+        title: "Evento criado com sucesso!",
         description: data.titulo,
       });
   
-      router.push('/dashboard');
-
+      router.push("/dashboard");
+  
     } catch (error: any) {
-      console.error('ERRO COMPLETO AO CRIAR EVENTO:', error);
+      console.error("ERRO COMPLETO AO CRIAR EVENTO:", error);
   
       toast({
-        variant: 'destructive',
-        title: 'Erro ao salvar evento',
+        variant: "destructive",
+        title: "Erro ao salvar evento",
         description:
           error.message ||
-          'Ocorreu uma falha desconhecida. Verifique as regras do Firebase e o console do navegador para mais detalhes.',
+          "Ocorreu uma falha desconhecida. Verifique as regras do Firebase e o console do navegador para mais detalhes.",
       });
     } finally {
       setIsLoading(false);
