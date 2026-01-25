@@ -72,18 +72,6 @@ export default function NewEventPage() {
     },
   });
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      form.setValue('imagem', file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const onSubmit = async (data: EventFormValues) => {
     if (!user) {
         toast({ variant: "destructive", title: "Não autenticado", description: "Você precisa estar logado para criar um evento." });
@@ -172,7 +160,23 @@ export default function NewEventPage() {
                                 <FormItem>
                                 <FormControl>
                                     <div className="w-full border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:border-primary transition-colors">
-                                    <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" id="image-upload" />
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                                field.onChange(file);
+                                                const reader = new FileReader();
+                                                reader.onloadend = () => {
+                                                    setImagePreview(reader.result as string);
+                                                };
+                                                reader.readAsDataURL(file);
+                                            }
+                                        }}
+                                        className="hidden"
+                                        id="image-upload"
+                                    />
                                     <label htmlFor="image-upload" className="w-full cursor-pointer">
                                         {imagePreview ? (
                                         <div className="relative w-full h-64 rounded-md overflow-hidden">
