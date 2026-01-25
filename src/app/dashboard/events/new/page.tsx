@@ -6,8 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import {
@@ -34,9 +33,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft, Upload } from 'lucide-react';
+import { Loader2, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import Image from 'next/image';
 
 const eventSchema = z.object({
   titulo: z.string().min(5, { message: 'O título deve ter pelo menos 5 caracteres.' }),
@@ -56,8 +54,6 @@ export default function NewEventPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const form = useForm<EventFormValues>({
     resolver: zodResolver(eventSchema),
@@ -71,18 +67,6 @@ export default function NewEventPage() {
     },
   });
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const onSubmit = async (data: EventFormValues) => {
     if (!user?.uid) {
       toast({
@@ -93,29 +77,9 @@ export default function NewEventPage() {
       return;
     }
   
-    if (!imageFile) {
-      toast({
-        variant: "destructive",
-        title: "Imagem obrigatória",
-        description: "Envie uma imagem para o evento.",
-      });
-      return;
-    }
-  
     setIsLoading(true);
   
     try {
-      console.log("Iniciando upload...");
-  
-      const imagePath = `eventos/${user.uid}/${Date.now()}_${imageFile.name}`;
-      const imageRef = ref(storage, imagePath);
-  
-      const uploadSnapshot = await uploadBytes(imageRef, imageFile);
-      console.log("Upload concluído");
-  
-      const imageUrl = await getDownloadURL(uploadSnapshot.ref);
-      console.log("URL da imagem:", imageUrl);
-  
       const eventData = {
         titulo: data.titulo,
         descricao: data.descricao,
@@ -123,7 +87,7 @@ export default function NewEventPage() {
         data: data.data,
         local: data.local,
         preco: Number(data.preco),
-        imagem_url: imageUrl,
+        imagem_url: "https://images.unsplash.com/photo-1516849841032-87cbac4d88f7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxwcm9kdWN0JTIwbGF1bmNofGVufDB8fHx8MTc2OTI1NzY5Mnww&ixlib=rb-4.1.0&q=80&w=1080",
         id_criador: user.uid,
         criadoEm: serverTimestamp(),
         status: "ativo",
@@ -169,8 +133,8 @@ export default function NewEventPage() {
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="space-y-6">
                     <Card>
                         <CardHeader><CardTitle>Informações Principais</CardTitle></CardHeader>
                         <CardContent className="space-y-4">
@@ -190,36 +154,9 @@ export default function NewEventPage() {
                             )}/>
                         </CardContent>
                     </Card>
-                    <Card>
-                        <CardHeader><CardTitle>Imagem do Evento</CardTitle></CardHeader>
-                        <CardContent>
-                            <div className="w-full border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:border-primary transition-colors">
-                            <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleImageChange}
-                                className="hidden"
-                                id="image-upload"
-                            />
-                            <label htmlFor="image-upload" className="w-full cursor-pointer">
-                                {imagePreview ? (
-                                <div className="relative w-full h-64 rounded-md overflow-hidden">
-                                    <Image src={imagePreview} alt="Preview da imagem" fill style={{objectFit: 'cover'}} />
-                                </div>
-                                ) : (
-                                <div className="space-y-2">
-                                    <Upload className="mx-auto h-10 w-10 text-muted-foreground" />
-                                    <p className="font-semibold">Clique para carregar uma imagem</p>
-                                    <p className="text-xs text-muted-foreground">PNG, JPG, GIF até 10MB</p>
-                                </div>
-                                )}
-                            </label>
-                            </div>
-                        </CardContent>
-                    </Card>
                 </div>
 
-                <div className="lg:col-span-1 space-y-6">
+                <div className="space-y-6">
                     <Card>
                         <CardHeader><CardTitle>Detalhes</CardTitle></CardHeader>
                         <CardContent className="space-y-4">
