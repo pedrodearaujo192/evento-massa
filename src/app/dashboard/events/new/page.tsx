@@ -294,8 +294,8 @@ export default function NewEventPage() {
                   <CardTitle>Imagem do Evento</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <FormItem>
-                    <FormLabel
+                  <div className="space-y-2">
+                    <label
                       htmlFor="image-upload"
                       className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted"
                     >
@@ -316,18 +316,15 @@ export default function NewEventPage() {
                           <p className="text-xs text-muted-foreground">PNG, JPG ou WEBP (MAX. 5MB)</p>
                         </div>
                       )}
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        id="image-upload"
-                        type="file"
-                        className="hidden"
-                        accept="image/png, image/jpeg, image/webp"
-                        onChange={handleImageChange}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+                    </label>
+                    <Input
+                      id="image-upload"
+                      type="file"
+                      className="hidden"
+                      accept="image/png, image/jpeg, image/webp"
+                      onChange={handleImageChange}
+                    />
+                  </div>
                 </CardContent>
               </Card>
             </div>
