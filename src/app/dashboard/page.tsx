@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Event } from '@/lib/types';
 import { useAuth } from '@/hooks/use-auth';
@@ -36,14 +36,21 @@ export default function DashboardPage() {
     if (user) {
       const q = query(
         collection(db, 'eventos'),
-        where('id_criador', '==', user.uid),
-        orderBy('criadoEm', 'desc')
+        where('id_criador', '==', user.uid)
       );
       const unsubscribe = onSnapshot(q, (querySnapshot) => {
         const eventsData: Event[] = [];
         querySnapshot.forEach((doc) => {
           eventsData.push({ id: doc.id, ...doc.data() } as Event);
         });
+        
+        // Sort events on the client-side by creation date, descending
+        eventsData.sort((a, b) => {
+          const timeA = a.criadoEm?.toMillis() || 0;
+          const timeB = b.criadoEm?.toMillis() || 0;
+          return timeB - timeA;
+        });
+
         setEvents(eventsData);
         setLoading(false);
       });
