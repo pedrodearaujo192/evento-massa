@@ -68,6 +68,15 @@ export default function NewEventPage() {
 
   const form = useForm<EventFormValues>({
     resolver: zodResolver(eventSchema),
+    defaultValues: {
+      titulo: '',
+      descricao: '',
+      local: '',
+      preco: 0,
+      categoria: undefined,
+      data: undefined,
+      imagem: undefined,
+    },
   });
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
