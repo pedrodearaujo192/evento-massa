@@ -93,15 +93,16 @@ export function DashboardLayout({ children, navItems, allowedRole }: DashboardLa
           <SidebarMenu>
             {navItems.map((item) => (
               <SidebarMenuItem key={item.href}>
-                <Link href={item.href} passHref legacyBehavior>
-                  <SidebarMenuButton
-                    isActive={pathname === item.href}
-                    tooltip={item.tooltip}
-                  >
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === item.href}
+                  tooltip={item.tooltip}
+                >
+                  <Link href={item.href}>
                     <item.icon />
                     <span>{item.label}</span>
-                  </SidebarMenuButton>
-                </Link>
+                  </Link>
+                </SidebarMenuButton>
               </SidebarMenuItem>
             ))}
           </SidebarMenu>
@@ -142,12 +143,12 @@ export function DashboardLayout({ children, navItems, allowedRole }: DashboardLa
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <Link href={allowedRole === 'adm_evento' ? '/dashboard/profile' : '/super-admin/profile'} passHref>
-                <DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href={allowedRole === 'adm_evento' ? '/dashboard/profile' : '/super-admin/profile'}>
                     <UserIcon className="mr-2 h-4 w-4" />
                     <span>Perfil</span>
-                </DropdownMenuItem>
-              </Link>
+                </Link>
+              </DropdownMenuItem>
               <DropdownMenuItem disabled>
                 <Settings className="mr-2 h-4 w-4" />
                 <span>Configurações</span>
