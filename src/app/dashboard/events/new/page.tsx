@@ -93,14 +93,16 @@ export default function NewEventPage() {
     
     try {
         let imageUrl = 'https://picsum.photos/seed/default-event/1200/800'; // Default image
-        if (data.imagem) {
-            const imageRef = ref(storage, `eventos/${user.uid}_${Date.now()}_${data.imagem.name}`);
-            const snapshot = await uploadBytes(imageRef, data.imagem);
+        const { imagem, ...eventData } = data;
+
+        if (imagem) {
+            const imageRef = ref(storage, `eventos/${user.uid}_${Date.now()}_${imagem.name}`);
+            const snapshot = await uploadBytes(imageRef, imagem);
             imageUrl = await getDownloadURL(snapshot.ref);
         }
 
         await addDoc(collection(db, 'eventos'), {
-            ...data,
+            ...eventData,
             imagem_url: imageUrl,
             id_criador: user.uid,
             criadoEm: serverTimestamp(),
@@ -120,7 +122,8 @@ export default function NewEventPage() {
         title: 'Erro ao criar evento',
         description: 'Ocorreu um problema. Por favor, tente novamente.',
       });
-      setIsLoading(false);
+    } finally {
+        setIsLoading(false);
     }
   };
 
@@ -172,7 +175,7 @@ export default function NewEventPage() {
                                     <label htmlFor="image-upload" className="w-full cursor-pointer">
                                         {imagePreview ? (
                                         <div className="relative w-full h-64 rounded-md overflow-hidden">
-                                            <Image src={imagePreview} alt="Preview da imagem" layout="fill" objectFit="cover" />
+                                            <Image src={imagePreview} alt="Preview da imagem" fill objectFit="cover" />
                                         </div>
                                         ) : (
                                         <div className="space-y-2">
