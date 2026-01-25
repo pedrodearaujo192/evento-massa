@@ -2,7 +2,7 @@
 
 import { createContext, useState, useEffect, ReactNode } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, serverTimestamp, collection, query, where, Timestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { UserProfile } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
@@ -26,20 +26,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
-      if (user) {
-        const userDocRef = doc(db, 'usuarios', user.uid);
+      if (user && user.email) {
+        // We will listen to changes based on the user's email, 
+        // as the document ID for 'adm_evento' might not match the auth UID.
+        const q = query(collection(db, 'usuarios'), where('email', '==', user.email));
         
-        const unsubSnapshot = onSnapshot(userDocRef, async (docSnap) => {
-          if (docSnap.exists()) {
-            // If the user document exists, set the user data.
-            setUserData({ uid: docSnap.id, ...docSnap.data() } as UserProfile);
+        const unsubSnapshot = onSnapshot(q, async (querySnapshot) => {
+          if (!querySnapshot.empty) {
+            // If a user document is found with the email, use it.
+            const userDoc = querySnapshot.docs[0];
+            setUserData({ uid: userDoc.id, ...userDoc.data() } as UserProfile);
             setLoading(false);
           } else {
-            // If the document doesn't exist, we might need to create it.
-            // Check if it's the designated super admin logging in for the first time.
+            // If no document is found by email, check if it's the super admin's first login.
+            // This is a special case to bootstrap the first user.
             if (user.email === SUPER_ADMIN_EMAIL) {
+              const userDocRef = doc(db, 'usuarios', user.uid);
               try {
-                // Create the super admin document in Firestore.
+                // Create the super admin document in Firestore with the UID as the document ID.
                 await setDoc(userDocRef, {
                   nome: user.displayName || 'Super Admin',
                   email: user.email,
@@ -47,17 +51,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   ativo: true,
                   criadoEm: serverTimestamp(),
                 });
-                // The onSnapshot listener will be triggered again by this setDoc,
-                // and the "if (docSnap.exists())" block will execute, setting the userData.
-                // We don't need to do anything else here.
+                // After creation, the onSnapshot listener for the query will fire,
+                // but we can also set it directly to speed up the first login.
+                const newProfile: UserProfile = {
+                    uid: user.uid,
+                    nome: user.displayName || 'Super Admin',
+                    email: user.email!,
+                    tipo: 'super_adm',
+                    ativo: true,
+                    criadoEm: serverTimestamp() as Timestamp,
+                };
+                setUserData(newProfile);
+                setLoading(false);
               } catch (error) {
                 console.error("Failed to create super admin profile:", error);
-                // If creation fails, proceed as a user with no data.
                 setUserData(null);
                 setLoading(false);
               }
             } else {
-              // For any other user without a profile, they have no data.
+              // For any other authenticated user without a profile document, they have no data.
               setUserData(null);
               setLoading(false);
             }

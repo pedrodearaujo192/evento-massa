@@ -115,14 +115,14 @@ export default function ProfilePage() {
     <div className="space-y-6">
       <div className="space-y-2">
         <h1 className="font-headline text-3xl md:text-4xl">Meu Perfil</h1>
-        <p className="text-muted-foreground">Atualize suas informações pessoais e de sua empresa.</p>
+        <p className="text-muted-foreground">Atualize suas informações pessoais.</p>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Informações do Usuário</CardTitle>
           <CardDescription>
-            Essas informações serão exibidas publicamente em seus eventos.
+            Estas são as suas informações de super administrador.
           </CardDescription>
         </CardHeader>
         <CardContent>
