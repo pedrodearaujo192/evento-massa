@@ -47,7 +47,6 @@ const eventSchema = z.object({
   local: z.string().min(3, { message: 'O local é obrigatório.' }),
   preco: z.coerce.number().min(0, { message: 'O preço não pode ser negativo.' }),
   descricao: z.string().min(10, { message: 'A descrição deve ter pelo menos 10 caracteres.' }),
-  imagem: z.any().optional(),
 });
 
 type EventFormValues = z.infer<typeof eventSchema>;
@@ -57,6 +56,7 @@ export default function NewEventPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const form = useForm<EventFormValues>({
@@ -68,7 +68,6 @@ export default function NewEventPage() {
       preco: 0,
       categoria: undefined,
       data: '',
-      imagem: null,
     },
   });
 
@@ -82,16 +81,14 @@ export default function NewEventPage() {
     try {
         let imageUrl = 'https://picsum.photos/seed/default-event/1200/800'; // Default image
         
-        const { imagem, ...eventData } = data;
-
-        if (imagem && imagem instanceof File) {
-            const imageRef = ref(storage, `eventos/${user.uid}_${Date.now()}_${imagem.name}`);
-            const snapshot = await uploadBytes(imageRef, imagem);
+        if (imageFile) {
+            const imageRef = ref(storage, `eventos/${user.uid}_${Date.now()}_${imageFile.name}`);
+            const snapshot = await uploadBytes(imageRef, imageFile);
             imageUrl = await getDownloadURL(snapshot.ref);
         }
 
         await addDoc(collection(db, 'eventos'), {
-            ...eventData,
+            ...data,
             imagem_url: imageUrl,
             id_criador: user.uid,
             criadoEm: serverTimestamp(),
@@ -115,6 +112,19 @@ export default function NewEventPage() {
         setIsLoading(false);
     }
   };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
 
   return (
     <div className="space-y-6">
@@ -156,45 +166,28 @@ export default function NewEventPage() {
                     <Card>
                         <CardHeader><CardTitle>Imagem do Evento</CardTitle></CardHeader>
                         <CardContent>
-                            <FormField control={form.control} name="imagem" render={({ field }) => (
-                                <FormItem>
-                                <FormControl>
-                                    <div className="w-full border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:border-primary transition-colors">
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={(e) => {
-                                            const file = e.target.files?.[0];
-                                            if (file) {
-                                                field.onChange(file);
-                                                const reader = new FileReader();
-                                                reader.onloadend = () => {
-                                                    setImagePreview(reader.result as string);
-                                                };
-                                                reader.readAsDataURL(file);
-                                            }
-                                        }}
-                                        className="hidden"
-                                        id="image-upload"
-                                    />
-                                    <label htmlFor="image-upload" className="w-full cursor-pointer">
-                                        {imagePreview ? (
-                                        <div className="relative w-full h-64 rounded-md overflow-hidden">
-                                            <Image src={imagePreview} alt="Preview da imagem" fill style={{objectFit: 'cover'}} />
-                                        </div>
-                                        ) : (
-                                        <div className="space-y-2">
-                                            <Upload className="mx-auto h-10 w-10 text-muted-foreground" />
-                                            <p className="font-semibold">Clique para carregar uma imagem</p>
-                                            <p className="text-xs text-muted-foreground">PNG, JPG, GIF até 10MB</p>
-                                        </div>
-                                        )}
-                                    </label>
-                                    </div>
-                                </FormControl>
-                                <FormMessage />
-                                </FormItem>
-                            )}/>
+                            <div className="w-full border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:border-primary transition-colors">
+                            <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleImageChange}
+                                className="hidden"
+                                id="image-upload"
+                            />
+                            <label htmlFor="image-upload" className="w-full cursor-pointer">
+                                {imagePreview ? (
+                                <div className="relative w-full h-64 rounded-md overflow-hidden">
+                                    <Image src={imagePreview} alt="Preview da imagem" fill style={{objectFit: 'cover'}} />
+                                </div>
+                                ) : (
+                                <div className="space-y-2">
+                                    <Upload className="mx-auto h-10 w-10 text-muted-foreground" />
+                                    <p className="font-semibold">Clique para carregar uma imagem</p>
+                                    <p className="text-xs text-muted-foreground">PNG, JPG, GIF até 10MB</p>
+                                </div>
+                                )}
+                            </label>
+                            </div>
                         </CardContent>
                     </Card>
                 </div>
@@ -208,7 +201,7 @@ export default function NewEventPage() {
                                 <FormLabel>Categoria</FormLabel>
                                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                                     <FormControl>
-                                    <SelectTrigger><SelectValue placeholder="Selecione uma categoria" /></SelectTrigger>
+                                    <SelectTrigger><SelectValue placeholder="Selecione uma categoria" /></SelectValue>
                                     </FormControl>
                                     <SelectContent>
                                     <SelectItem value="Workshop">Workshop</SelectItem>
