@@ -71,21 +71,34 @@ export default function NewEventPage() {
     },
   });
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const onSubmit = async (data: EventFormValues) => {
     if (!user) {
         toast({ variant: "destructive", title: "Não autenticado", description: "Você precisa estar logado para criar um evento." });
         return;
     }
+    if (!imageFile) {
+        toast({ variant: "destructive", title: "Imagem necessária", description: "Por favor, carregue uma imagem para o evento." });
+        return;
+    }
+
     setIsLoading(true);
     
     try {
-        let imageUrl = 'https://picsum.photos/seed/default-event/1200/800'; // Default image
-        
-        if (imageFile) {
-            const imageRef = ref(storage, `eventos/${user.uid}_${Date.now()}_${imageFile.name}`);
-            const snapshot = await uploadBytes(imageRef, imageFile);
-            imageUrl = await getDownloadURL(snapshot.ref);
-        }
+        const imageRef = ref(storage, `eventos/${user.uid}_${Date.now()}_${imageFile.name}`);
+        const snapshot = await uploadBytes(imageRef, imageFile);
+        const imageUrl = await getDownloadURL(snapshot.ref);
 
         await addDoc(collection(db, 'eventos'), {
             ...data,
@@ -112,19 +125,6 @@ export default function NewEventPage() {
         setIsLoading(false);
     }
   };
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
 
   return (
     <div className="space-y-6">
@@ -201,7 +201,7 @@ export default function NewEventPage() {
                                 <FormLabel>Categoria</FormLabel>
                                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                                     <FormControl>
-                                    <SelectTrigger><SelectValue placeholder="Selecione uma categoria" /></SelectValue>
+                                    <SelectTrigger><SelectValue placeholder="Selecione uma categoria" /></SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
                                     <SelectItem value="Workshop">Workshop</SelectItem>
