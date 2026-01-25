@@ -1,3 +1,40 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "event-image-1",
+      "description": "A placeholder image for an event.",
+      "imageUrl": "https://images.unsplash.com/photo-1720036237217-5b1d3e90ed60?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxiZWF1dHklMjB3b3Jrc2hvcHxlbnwwfHx8fDE3NjkzNTQxODB8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "beauty workshop"
+    },
+    {
+      "id": "event-image-2",
+      "description": "A placeholder image for another event.",
+      "imageUrl": "https://images.unsplash.com/photo-1579039437018-0305d33e69f9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxtYWtldXAlMjBtYXN0ZXJjbGFzc3xlbnwwfHx8fDE3NjkzNTQxODB8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "makeup masterclass"
+    },
+    {
+      "id": "event-image-3",
+      "description": "A placeholder image for a conference.",
+      "imageUrl": "https://images.unsplash.com/photo-1615776649238-b2c1600c9565?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxiZWF1dHklMjBjb25mZXJlbmNlfGVufDB8fHx8MTc2OTM1NDE4MHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "beauty conference"
+    },
+    {
+      "id": "event-image-4",
+      "description": "A placeholder image for a product launch.",
+      "imageUrl": "https://images.unsplash.com/photo-1516849841032-87cbac4d88f7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxwcm9kdWN0JTIwbGF1bmNofGVufDB8fHx8MTc2OTI1NzY5Mnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "product launch"
+    },
+    {
+      "id": "avatar-1",
+      "description": "Placeholder avatar image for a user.",
+      "imageUrl": "https://images.unsplash.com/photo-1580489944761-15a19d654956?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHx3b21hbiUyMHBvcnRyYWl0fGVufDB8fHx8MTc2OTMxNDAwNHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "woman portrait"
+    },
+    {
+      "id": "avatar-2",
+      "description": "Placeholder avatar image for another user.",
+      "imageUrl": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxtYW4lMjBwb3J0cmFpdHxlbnwwfHx8fDE3NjkzNTIxNTB8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "man portrait"
+    }
+  ]
 }
