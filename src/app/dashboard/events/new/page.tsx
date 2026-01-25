@@ -13,14 +13,12 @@ import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -35,14 +33,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft, CalendarIcon, Upload } from 'lucide-react';
+import { Loader2, ArrowLeft, Upload } from 'lucide-react';
 import Link from 'next/link';
-import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import Image from 'next/image';
 
 const eventSchema = z.object({
@@ -50,7 +43,7 @@ const eventSchema = z.object({
   categoria: z.enum(['Workshop', 'Congresso', 'Masterclass', 'Lançamento'], {
     required_error: 'Selecione uma categoria.',
   }),
-  data: z.date({ required_error: 'A data do evento é obrigatória.' }),
+  data: z.string({ required_error: 'A data do evento é obrigatória.' }).min(1, { message: 'A data do evento é obrigatória.' }),
   local: z.string().min(3, { message: 'O local é obrigatório.' }),
   preco: z.coerce.number().min(0, { message: 'O preço não pode ser negativo.' }),
   descricao: z.string().min(10, { message: 'A descrição deve ter pelo menos 10 caracteres.' }),
@@ -74,7 +67,7 @@ export default function NewEventPage() {
       local: '',
       preco: 0,
       categoria: undefined,
-      data: undefined,
+      data: '',
       imagem: undefined,
     },
   });
@@ -108,7 +101,6 @@ export default function NewEventPage() {
 
         await addDoc(collection(db, 'eventos'), {
             ...data,
-            data: format(data.data, 'yyyy-MM-dd'),
             imagem_url: imageUrl,
             id_criador: user.uid,
             criadoEm: serverTimestamp(),
@@ -206,7 +198,7 @@ export default function NewEventPage() {
                             <FormField control={form.control} name="categoria" render={({ field }) => (
                                 <FormItem>
                                 <FormLabel>Categoria</FormLabel>
-                                <Select onValueChange={field.onChange} value={field.value}>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
                                     <FormControl>
                                     <SelectTrigger><SelectValue placeholder="Selecione uma categoria" /></SelectTrigger>
                                     </FormControl>
@@ -220,25 +212,23 @@ export default function NewEventPage() {
                                 <FormMessage />
                                 </FormItem>
                             )}/>
-                            <FormField control={form.control} name="data" render={({ field }) => (
-                                <FormItem className="flex flex-col">
-                                <FormLabel>Data do Evento</FormLabel>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                    <FormControl>
-                                        <Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                                        {field.value ? format(field.value, 'PPP', { locale: ptBR }) : <span>Escolha uma data</span>}
-                                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                        </Button>
-                                    </FormControl>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))} initialFocus />
-                                    </PopoverContent>
-                                </Popover>
-                                <FormMessage />
+                            <FormField
+                              control={form.control}
+                              name="data"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Data do Evento</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="date"
+                                      {...field}
+                                      min={new Date().toISOString().split("T")[0]}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
                                 </FormItem>
-                            )}/>
+                              )}
+                            />
                             <FormField control={form.control} name="local" render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Local</FormLabel>

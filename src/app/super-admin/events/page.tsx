@@ -53,7 +53,7 @@ export default async function AllEventsPage() {
                 <div className="space-y-2 text-sm text-muted-foreground">
                     <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4" />
-                        <span>{format(new Date(event.data), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</span>
+                        <span>{format(new Date(event.data.replace(/-/g, '/')), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <MapPin className="h-4 w-4" />
