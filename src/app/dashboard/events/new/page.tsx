@@ -91,11 +91,12 @@ export default function NewEventPage() {
       toast({
         variant: 'destructive',
         title: 'Sessão inválida',
-        description: 'Faça login novamente.',
+        description: 'Faça login novamente para continuar.',
       });
+      console.error("Tentativa de envio sem user.uid. User:", user);
       return;
     }
-
+  
     if (!imageFile) {
       toast({
         variant: 'destructive',
@@ -104,20 +105,27 @@ export default function NewEventPage() {
       });
       return;
     }
-
+  
     setIsLoading(true);
-
+  
     try {
-      console.log('Iniciando upload da imagem...');
+      console.log("USER COMPLETO:", user);
+      console.log("UID:", user?.uid);
+
+      console.log("Arquivo:", imageFile);
+      console.log("Tipo:", imageFile.type);
+      console.log("Tamanho:", imageFile.size);
+
+      console.log("Iniciando upload da imagem...");
       const imagePath = `eventos/${user.uid}/${Date.now()}_${imageFile.name}`;
       const imageRef = ref(storage, imagePath);
-
+  
       const uploadSnapshot = await uploadBytes(imageRef, imageFile);
       console.log('Upload da imagem concluído.');
-
+  
       const imageUrl = await getDownloadURL(uploadSnapshot.ref);
       console.log('URL da imagem obtida:', imageUrl);
-
+  
       const eventData = {
         titulo: data.titulo,
         descricao: data.descricao,
@@ -130,31 +138,33 @@ export default function NewEventPage() {
         criadoEm: serverTimestamp(),
         status: 'ativo',
       };
-
+  
       console.log('Salvando dados do evento no Firestore:', eventData);
-
+  
       await addDoc(collection(db, 'eventos'), eventData);
-
+  
       toast({
         title: 'Evento criado com sucesso!',
         description: data.titulo,
       });
-
+  
       router.push('/dashboard');
+
     } catch (error: any) {
       console.error('ERRO COMPLETO AO CRIAR EVENTO:', error);
-
+  
       toast({
         variant: 'destructive',
         title: 'Erro ao salvar evento',
         description:
           error.message ||
-          'Ocorreu uma falha desconhecida. Verifique suas regras do Firebase.',
+          'Ocorreu uma falha desconhecida. Verifique as regras do Firebase e o console do navegador para mais detalhes.',
       });
     } finally {
       setIsLoading(false);
     }
   };
+
 
   return (
     <div className="space-y-6">
