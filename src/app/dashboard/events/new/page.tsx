@@ -84,45 +84,72 @@ export default function NewEventPage() {
   };
 
   const onSubmit = async (data: EventFormValues) => {
-    if (!user) {
-        toast({ variant: "destructive", title: "Não autenticado", description: "Você precisa estar logado para criar um evento." });
-        return;
-    }
-    if (!imageFile) {
-        toast({ variant: "destructive", title: "Imagem necessária", description: "Por favor, carregue uma imagem para o evento." });
-        return;
-    }
-
-    setIsLoading(true);
-    
-    try {
-        const imageRef = ref(storage, `eventos/${user.uid}_${Date.now()}_${imageFile.name}`);
-        const snapshot = await uploadBytes(imageRef, imageFile);
-        const imageUrl = await getDownloadURL(snapshot.ref);
-
-        await addDoc(collection(db, 'eventos'), {
-            ...data,
-            imagem_url: imageUrl,
-            id_criador: user.uid,
-            criadoEm: serverTimestamp(),
-            status: 'ativo',
-        });
-      
+    if (!user?.uid) {
       toast({
-        title: 'Evento Criado com Sucesso!',
-        description: `"${data.titulo}" foi adicionado à sua lista de eventos.`,
+        variant: "destructive",
+        title: "Sessão inválida",
+        description: "Faça login novamente.",
       });
-      router.push('/dashboard');
-
-    } catch (error: any) {
-      console.error("Error creating event: ", error);
+      return;
+    }
+  
+    if (!imageFile) {
       toast({
-        variant: 'destructive',
-        title: 'Erro ao criar evento',
-        description: error.message || 'Ocorreu um problema. Por favor, tente novamente.',
+        variant: "destructive",
+        title: "Imagem obrigatória",
+        description: "Envie uma imagem para o evento.",
+      });
+      return;
+    }
+  
+    setIsLoading(true);
+  
+    try {
+      console.log("Iniciando upload...");
+  
+      const imagePath = `eventos/${user.uid}/${Date.now()}_${imageFile.name}`;
+      const imageRef = ref(storage, imagePath);
+  
+      const uploadSnapshot = await uploadBytes(imageRef, imageFile);
+      console.log("Upload concluído");
+  
+      const imageUrl = await getDownloadURL(uploadSnapshot.ref);
+      console.log("URL da imagem:", imageUrl);
+  
+      const eventData = {
+        titulo: data.titulo,
+        descricao: data.descricao,
+        categoria: data.categoria,
+        data: data.data,
+        local: data.local,
+        preco: Number(data.preco),
+        imagem_url: imageUrl,
+        id_criador: user.uid,
+        criadoEm: serverTimestamp(),
+        status: "ativo",
+      };
+  
+      console.log("Salvando Firestore:", eventData);
+  
+      await addDoc(collection(db, "eventos"), eventData);
+  
+      toast({
+        title: "Evento criado com sucesso!",
+        description: data.titulo,
+      });
+  
+      router.push("/dashboard");
+  
+    } catch (error: any) {
+      console.error("ERRO COMPLETO:", error);
+  
+      toast({
+        variant: "destructive",
+        title: "Erro ao salvar",
+        description: error.message || "Falha desconhecida",
       });
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
   };
 
