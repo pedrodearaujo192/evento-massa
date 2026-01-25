@@ -47,7 +47,7 @@ const eventSchema = z.object({
   local: z.string().min(3, { message: 'O local é obrigatório.' }),
   preco: z.coerce.number().min(0, { message: 'O preço não pode ser negativo.' }),
   descricao: z.string().min(10, { message: 'A descrição deve ter pelo menos 10 caracteres.' }),
-  imagem: z.instanceof(File).optional(),
+  imagem: z.any().optional(),
 });
 
 type EventFormValues = z.infer<typeof eventSchema>;
@@ -68,7 +68,7 @@ export default function NewEventPage() {
       preco: 0,
       categoria: undefined,
       data: '',
-      imagem: undefined,
+      imagem: null,
     },
   });
 
@@ -93,9 +93,10 @@ export default function NewEventPage() {
     
     try {
         let imageUrl = 'https://picsum.photos/seed/default-event/1200/800'; // Default image
+        
         const { imagem, ...eventData } = data;
 
-        if (imagem) {
+        if (imagem && imagem instanceof File) {
             const imageRef = ref(storage, `eventos/${user.uid}_${Date.now()}_${imagem.name}`);
             const snapshot = await uploadBytes(imageRef, imagem);
             imageUrl = await getDownloadURL(snapshot.ref);
@@ -115,12 +116,12 @@ export default function NewEventPage() {
       });
       router.push('/dashboard');
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating event: ", error);
       toast({
         variant: 'destructive',
         title: 'Erro ao criar evento',
-        description: 'Ocorreu um problema. Por favor, tente novamente.',
+        description: error.message || 'Ocorreu um problema. Por favor, tente novamente.',
       });
     } finally {
         setIsLoading(false);
@@ -175,7 +176,7 @@ export default function NewEventPage() {
                                     <label htmlFor="image-upload" className="w-full cursor-pointer">
                                         {imagePreview ? (
                                         <div className="relative w-full h-64 rounded-md overflow-hidden">
-                                            <Image src={imagePreview} alt="Preview da imagem" fill objectFit="cover" />
+                                            <Image src={imagePreview} alt="Preview da imagem" fill style={{objectFit: 'cover'}} />
                                         </div>
                                         ) : (
                                         <div className="space-y-2">
