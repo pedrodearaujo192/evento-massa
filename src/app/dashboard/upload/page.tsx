@@ -60,8 +60,8 @@ export default function UploadTestPage() {
 
     setIsLoading(true);
     try {
-      // Usando um caminho simplificado para facilitar a depuração das regras
-      const imagePath = `test-uploads/${user.uid}-${imageFile.name}`;
+      // O caminho agora corresponde à estrutura das regras do Storage (eventos/{userId}/...)
+      const imagePath = `eventos/${user.uid}/TEST-${Date.now()}-${imageFile.name}`;
       const imageStorageRef = ref(storage, imagePath);
 
       console.log('Iniciando UPLOAD DE TESTE...');
@@ -83,7 +83,7 @@ export default function UploadTestPage() {
         variant: 'destructive',
         title: 'Erro no upload de teste',
         description:
-          'Falha no upload. Verifique o console do navegador e as regras do Firebase Storage.',
+          'Falha no upload. Verifique as regras do Firebase Storage e o console do navegador.',
       });
     } finally {
       setIsLoading(false);
@@ -103,7 +103,7 @@ export default function UploadTestPage() {
         <CardHeader>
           <CardTitle>Enviar Imagem</CardTitle>
           <CardDescription>
-            Selecione um arquivo de imagem e clique em "Enviar para Teste" para fazer o upload.
+            Selecione um arquivo de imagem e clique em "Enviar para Teste" para fazer o upload para a pasta correta.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
