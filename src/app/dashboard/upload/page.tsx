@@ -61,7 +61,7 @@ export default function UploadTestPage() {
     setIsLoading(true);
     try {
       console.log('Iniciando UPLOAD DE TESTE...');
-      const imagePath = `testes/${user.uid}/${Date.now()}_${imageFile.name}`;
+      const imagePath = `eventos/${user.uid}/test-uploads/${Date.now()}_${imageFile.name}`;
       const imageStorageRef = ref(storage, imagePath);
 
       console.log("Arquivo:", imageFile);
@@ -74,7 +74,7 @@ export default function UploadTestPage() {
       console.log('Upload de teste concluído. URL:', imageUrl);
       toast({
         title: 'Upload de teste bem-sucedido!',
-        description: `A imagem foi enviada para o Storage. URL: ${imageUrl}`,
+        description: `A imagem foi enviada para: ${imagePath}`,
       });
     } catch (error: any) {
       console.error('ERRO NO UPLOAD DE TESTE:', error);
@@ -83,7 +83,7 @@ export default function UploadTestPage() {
         title: 'Erro no upload de teste',
         description:
           error.message ||
-          'Ocorreu uma falha desconhecida. Verifique as regras do Firebase e o console do navegador para mais detalhes.',
+          'Falha desconhecida. Verifique se as regras do Firebase Storage permitem escrita no caminho correto.',
       });
     } finally {
       setIsLoading(false);
