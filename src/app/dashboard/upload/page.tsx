@@ -14,8 +14,9 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, UploadCloud, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Loader2, UploadCloud, CheckCircle, Info } from 'lucide-react';
 import Image from 'next/image';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function UploadPage() {
   const { user } = useAuth();
@@ -24,10 +25,12 @@ export default function UploadPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
+  const [attemptLogs, setAttemptLogs] = useState<string[]>([]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    setUploadedUrl(null); // Reset on new image selection
+    setUploadedUrl(null);
+    setAttemptLogs([]);
     if (file) {
       setImageFile(file);
       const reader = new FileReader();
@@ -42,43 +45,47 @@ export default function UploadPage() {
   };
 
   const handleUpload = async () => {
+    setAttemptLogs([]);
     if (!user || !user.uid) {
-      toast({
-        variant: 'destructive',
-        title: 'Usuário não autenticado',
-        description: 'Faça login novamente para poder enviar.',
-      });
+      const msg = 'ERRO: Usuário não autenticado. Faça login novamente para poder enviar.';
       console.error("Upload attempt failed: user or user.uid is not available.", { user });
+      setAttemptLogs(prev => [...prev, msg]);
+      toast({ variant: 'destructive', title: 'Falha no Upload', description: msg.replace('ERRO: ','') });
       return;
     }
 
     if (!imageFile) {
-      toast({
-        variant: 'destructive',
-        title: 'Nenhuma imagem selecionada',
-        description: 'Por favor, selecione uma imagem para enviar.',
-      });
+      const msg = 'ERRO: Nenhuma imagem selecionada. Por favor, selecione uma imagem para enviar.';
+      setAttemptLogs(prev => [...prev, msg]);
+      toast({ variant: 'destructive', title: 'Nenhuma imagem selecionada', description: msg.replace('ERRO: ','') });
       return;
     }
 
     setIsLoading(true);
     setUploadedUrl(null);
     
-    // Path consistent with security rules: eventos/{userId}/{fileName}
     const imagePath = `eventos/${user.uid}/test-${Date.now()}-${imageFile.name}`;
     const imageStorageRef = ref(storage, imagePath);
 
     try {
-      console.log('--- INICIANDO TESTE DE UPLOAD ---');
-      console.log('Usuário UID:', user.uid);
-      console.log('Caminho de destino no Storage:', imagePath);
-      console.log('Arquivo:', imageFile.name, `(${imageFile.size} bytes)`);
+      const logs: string[] = [];
+      const log = (message: string) => {
+        console.log(message);
+        logs.push(message);
+        setAttemptLogs([...logs]);
+      }
+      
+      log('--- INICIANDO TESTE DE UPLOAD ---');
+      log(`Usuário UID: ${user.uid}`);
+      log(`Caminho de destino no Storage: ${imagePath}`);
+      log(`Arquivo: ${imageFile.name} (${imageFile.size} bytes)`);
+      log('Aguardando uploadBytes(imageRef, imageFile)...');
 
       await uploadBytes(imageStorageRef, imageFile);
+      log('--- UPLOAD BEM-SUCEDIDO ---');
+      
       const imageUrl = await getDownloadURL(imageStorageRef);
-
-      console.log('--- UPLOAD BEM-SUCEDIDO ---');
-      console.log('URL da imagem:', imageUrl);
+      log(`URL da imagem obtida: ${imageUrl}`);
       
       setUploadedUrl(imageUrl);
       toast({
@@ -87,14 +94,20 @@ export default function UploadPage() {
       });
 
     } catch (error: any) {
-      console.error('--- ERRO NO UPLOAD ---', error);
-      console.error('Código do Erro:', error.code);
-      console.error('Mensagem do Erro:', error.message);
-
+      const logs = [...attemptLogs];
+      const logError = (message: string) => {
+        console.error(message, error);
+        logs.push(message);
+      }
+      logError('--- ERRO NO UPLOAD ---');
+      logError(`Código do Erro: ${error.code || 'N/A'}`);
+      logError(`Mensagem do Erro: ${error.message || 'Desconhecido'}`);
+      setAttemptLogs(logs);
+      
       toast({
         variant: 'destructive',
         title: 'Falha no Upload',
-        description: `Verifique as regras do Firebase Storage e o console (F12). Erro: ${error.code || error.message}`,
+        description: `Ocorreu um erro. Verifique os logs nesta página. Erro: ${error.code || error.message}`,
       });
     } finally {
       setIsLoading(false);
@@ -104,11 +117,19 @@ export default function UploadPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="font-headline text-3xl md:text-4xl">Teste de Upload para o Storage</h1>
+        <h1 className="font-headline text-3xl md:text-4xl">Teste de Upload Isolado</h1>
         <p className="text-muted-foreground">
           Página dedicada para testar o envio de uma imagem para o Firebase Storage.
         </p>
       </div>
+
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertTitle>Como usar esta página</AlertTitle>
+        <AlertDescription>
+          Se o upload ficar "carregando" e não terminar, a causa mais provável é um bloqueio pelas <strong>Regras de Segurança do Storage</strong>. Verifique se suas regras permitem a escrita no caminho `eventos/{'{userId}'}/{'{fileName}'}`. Logs da tentativa aparecerão abaixo.
+        </AlertDescription>
+      </Alert>
 
       <Card>
         <CardHeader>
@@ -158,25 +179,36 @@ export default function UploadPage() {
             ) : (
               <UploadCloud className="mr-2 h-4 w-4" />
             )}
-            Passo 2: Enviar Imagem
+            Passo 2: Enviar Imagem para Teste
           </Button>
         </CardContent>
       </Card>
-
-      {uploadedUrl && (
-        <Card className="border-green-500">
+      
+      {attemptLogs.length > 0 && (
+        <Card>
            <CardHeader>
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-6 w-6 text-green-500" />
-                <CardTitle className="text-green-600">Upload Concluído</CardTitle>
-              </div>
+              <CardTitle>Resultados do Teste</CardTitle>
               <CardDescription>
-                A imagem foi enviada com sucesso. Este é o link dela no Storage:
+                Logs da tentativa de upload para depuração.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-                <Input readOnly value={uploadedUrl} className="text-xs" />
-                <Image src={uploadedUrl} alt="Imagem enviada" width={400} height={300} className="mt-4 rounded-md border" />
+            <CardContent className="space-y-4">
+                <div className="bg-muted/50 p-4 rounded-md font-mono text-xs space-y-1 overflow-x-auto max-h-60">
+                  {attemptLogs.map((log, index) => <p key={index}>{log}</p>)}
+                </div>
+                {uploadedUrl && (
+                  <div className="space-y-2 pt-4">
+                    <Alert variant="default" className="border-green-500 bg-green-500/10">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <AlertTitle className="text-green-700">Sucesso!</AlertTitle>
+                      <AlertDescription className="text-green-600">
+                        A imagem foi enviada. Link de acesso:
+                      </AlertDescription>
+                    </Alert>
+                    <Input readOnly value={uploadedUrl} className="text-xs" />
+                    <Image src={uploadedUrl} alt="Imagem enviada" width={400} height={300} className="mt-4 rounded-md border" />
+                  </div>
+                )}
             </CardContent>
         </Card>
       )}
