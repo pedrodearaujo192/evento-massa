@@ -3,11 +3,12 @@
 import React from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
-import { Loader2, Calendar, User, Upload } from 'lucide-react';
+import { Loader2, Calendar, User, Upload, PlusCircle } from 'lucide-react';
 import { DashboardLayout } from '@/components/dashboard-layout';
 
 const navItems = [
   { href: '/dashboard', label: 'Meus Eventos', icon: Calendar, tooltip: 'Meus Eventos' },
+  { href: '/dashboard/events/new', label: 'Criar Evento', icon: PlusCircle, tooltip: 'Criar Novo Evento' },
   { href: '/dashboard/profile', label: 'Meu Perfil', icon: User, tooltip: 'Meu Perfil' },
   { href: '/dashboard/upload', label: 'Upload Teste', icon: Upload, tooltip: 'Testar Upload' },
 ];
