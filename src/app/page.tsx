@@ -172,7 +172,10 @@ export default function HomePage() {
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12 text-center md:text-left">
             <div className="space-y-6 col-span-1 md:col-span-1">
-              <h3 className="text-3xl font-bold text-primary font-headline italic">EventoMassa</h3>
+              <div className="text-3xl font-black font-headline tracking-tighter italic">
+                <span className="text-secondary">Evento</span>
+                <span className="text-primary">Massa</span>
+              </div>
               <p className="text-sm text-background/60 leading-relaxed font-body">
                 Conectando talentos e criando o futuro do mercado da beleza através de experiências inesquecíveis.
               </p>

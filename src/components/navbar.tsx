@@ -39,9 +39,10 @@ export function Navbar() {
     <nav className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-20 items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2 group">
-          <span className="text-3xl font-black text-secondary font-headline tracking-tighter italic group-hover:scale-105 transition-transform">
-            EventoMassa
-          </span>
+          <div className="text-3xl font-black font-headline tracking-tighter italic group-hover:scale-105 transition-transform">
+            <span className="text-secondary">Evento</span>
+            <span className="text-primary">Massa</span>
+          </div>
         </Link>
 
         <div className="hidden md:flex items-center gap-8 mr-auto ml-12">
