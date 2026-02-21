@@ -4,7 +4,7 @@ import type { Event } from "@/lib/types";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
-import { Calendar, MapPin, Tag } from "lucide-react";
+import { Calendar, MapPin } from "lucide-react";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -39,7 +39,7 @@ export default async function AllEventsPage() {
               <CardHeader className="p-0">
                 <div className="relative h-48 w-full">
                   <Image
-                    src={event.imagem_url}
+                    src={event.imagem_url || "https://picsum.photos/seed/default/600/400"}
                     alt={event.titulo}
                     fill
                     className="object-cover"
