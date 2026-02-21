@@ -26,10 +26,9 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ShieldAlert } from 'lucide-react';
 import { Icons } from '@/components/icons';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ShieldAlert } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 
 const loginSchema = z.object({
@@ -45,8 +44,6 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const { user, loading: authLoading } = useAuth();
 
-  // If user is authenticated, redirect them to the root page.
-  // The root page will handle logic for routing to the correct dashboard.
   useEffect(() => {
     if (!authLoading && user) {
       router.replace('/');
@@ -65,23 +62,31 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       await signInWithEmailAndPassword(auth, data.email, data.password);
-      // On success, the auth state will change, and the useEffect above will handle the redirect.
       toast({
         title: 'Login bem-sucedido!',
         description: 'Redirecionando para o seu painel...',
       });
     } catch (error: any) {
-      console.error(error);
+      console.error("Erro no login:", error.code, error.message);
+      let message = 'Email ou senha incorretos. Por favor, tente novamente.';
+      
+      if (error.code === 'auth/invalid-credential') {
+        message = 'Credenciais inválidas. Verifique se o e-mail e a senha estão corretos ou se o usuário foi criado no Console do Firebase.';
+      } else if (error.code === 'auth/user-not-found') {
+        message = 'Usuário não encontrado.';
+      } else if (error.code === 'auth/wrong-password') {
+        message = 'Senha incorreta.';
+      }
+
       toast({
         variant: 'destructive',
         title: 'Erro no login',
-        description: 'Email ou senha incorretos. Por favor, tente novamente.',
+        description: message,
       });
-      setIsLoading(false); // Reset loading state on error
+      setIsLoading(false);
     }
   };
 
-  // While auth state is loading, or if user is logged in and we are waiting for redirect, show a full page loader.
   if (authLoading || user) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
@@ -90,7 +95,6 @@ export default function LoginPage() {
     );
   }
 
-  // Only render the form if the user is not logged in and auth is not loading.
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-background px-4">
       <div className="w-full max-w-md space-y-6">
@@ -149,7 +153,8 @@ export default function LoginPage() {
             <ShieldAlert className="h-4 w-4 !text-primary" />
             <AlertTitle className="font-bold text-primary">Acesso Super Admin</AlertTitle>
             <AlertDescription className="text-primary/90">
-                Para o primeiro acesso, use o email: <strong className="font-semibold">pedrodearaujo.192@gmail.com</strong>. A senha foi definida durante a configuração do projeto.
+                Para o primeiro acesso, use o email: <strong className="font-semibold">pedrodearaujo.192@gmail.com</strong>. <br/>
+                Certifique-se de que este usuário foi criado na aba <strong>Authentication</strong> do seu Console Firebase.
             </AlertDescription>
         </Alert>
 
