@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { ReactNode } from 'react';
@@ -42,10 +43,10 @@ type NavItem = {
 type DashboardLayoutProps = {
   children: ReactNode;
   navItems: NavItem[];
-  allowedRole: 'super_adm' | 'adm_evento';
+  allowedRoles: ('super_adm' | 'adm_evento')[];
 };
 
-export function DashboardLayout({ children, navItems, allowedRole }: DashboardLayoutProps) {
+export function DashboardLayout({ children, navItems, allowedRoles }: DashboardLayoutProps) {
   const { user, userData, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -62,12 +63,11 @@ export function DashboardLayout({ children, navItems, allowedRole }: DashboardLa
   };
   
   if (loading) {
-    return null; // Or a loading spinner, handled by AuthProvider
+    return null;
   }
 
-  if (!user || userData?.tipo !== allowedRole) {
-    // This should ideally not be reached if routing is correct, but as a safeguard:
-    if (typeof window !== 'undefined') {
+  if (!user || !userData || !allowedRoles.includes(userData.tipo as any)) {
+    if (typeof window !== 'undefined' && !loading) {
         router.replace('/login');
     }
     return null;
@@ -122,7 +122,6 @@ export function DashboardLayout({ children, navItems, allowedRole }: DashboardLa
         <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:px-6">
           <SidebarTrigger className="md:hidden" />
           <div className="flex-1">
-            {/* Can add breadcrumbs or page title here */}
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -144,14 +143,14 @@ export function DashboardLayout({ children, navItems, allowedRole }: DashboardLa
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link href={allowedRole === 'adm_evento' ? '/dashboard/profile' : '/super-admin/profile'}>
+                <Link href={userData?.tipo === 'adm_evento' ? '/dashboard/profile' : '/super-admin/profile'}>
                     <UserIcon className="mr-2 h-4 w-4" />
                     <span>Perfil</span>
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem disabled>
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Configurações</span>
+                <Home className="mr-2 h-4 w-4" />
+                <span>Voltar ao Site</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout}>

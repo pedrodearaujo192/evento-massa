@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -32,5 +33,5 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
     return null;
   }
   
-  return <DashboardLayout navItems={navItems} allowedRole="super_adm">{children}</DashboardLayout>;
+  return <DashboardLayout navItems={navItems} allowedRoles={['super_adm']}>{children}</DashboardLayout>;
 }

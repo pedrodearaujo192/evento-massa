@@ -1,9 +1,10 @@
+
 'use client';
 
 import React from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
-import { Loader2, Calendar, User, Upload, PlusCircle } from 'lucide-react';
+import { Loader2, Calendar, User, PlusCircle } from 'lucide-react';
 import { DashboardLayout } from '@/components/dashboard-layout';
 
 const navItems = [
@@ -24,12 +25,13 @@ export default function EventAdminLayout({ children }: { children: React.ReactNo
     );
   }
 
-  if (!user || userData?.tipo !== 'adm_evento') {
+  // Permite tanto adm_evento quanto super_adm acessarem as rotas de dashboard (como a criação de eventos)
+  if (!user || (userData?.tipo !== 'adm_evento' && userData?.tipo !== 'super_adm')) {
     if (typeof window !== 'undefined') {
         router.replace('/login');
     }
     return null;
   }
   
-  return <DashboardLayout navItems={navItems} allowedRole="adm_evento">{children}</DashboardLayout>;
+  return <DashboardLayout navItems={navItems} allowedRoles={['adm_evento', 'super_adm']}>{children}</DashboardLayout>;
 }
