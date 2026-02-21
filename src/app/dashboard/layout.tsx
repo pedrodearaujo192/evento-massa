@@ -8,9 +8,8 @@ import { DashboardLayout } from '@/components/dashboard-layout';
 
 const navItems = [
   { href: '/dashboard', label: 'Meus Eventos', icon: Calendar, tooltip: 'Meus Eventos' },
-  { href: '/dashboard/events/new', label: 'Criar Evento', icon: PlusCircle, tooltip: 'Criar Novo Evento' },
+  { href: '/dashboard/events/new', label: 'Criar Novo Evento', icon: PlusCircle, tooltip: 'Criar Novo Evento' },
   { href: '/dashboard/profile', label: 'Meu Perfil', icon: User, tooltip: 'Meu Perfil' },
-  { href: '/dashboard/upload', label: 'Upload Teste', icon: Upload, tooltip: 'Testar Upload' },
 ];
 
 export default function EventAdminLayout({ children }: { children: React.ReactNode }) {
