@@ -19,7 +19,7 @@ import {
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
-import { generateSlug } from '@/lib/utils';
+import { generateSlug, cn } from '@/lib/utils';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -43,7 +43,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Loader2, 
@@ -274,7 +273,7 @@ export default function NewEventPage() {
       <div className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b pb-4 mb-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-4">
           <div>
-            <div className="text-xs text-muted-foreground mb-1">Admin > Eventos > Novo</div>
+            <div className="text-xs text-muted-foreground mb-1">Admin {' > '} Eventos {' > '} Novo</div>
             <h1 className="text-3xl font-black font-headline tracking-tight">Criar Novo Evento</h1>
           </div>
           <div className="flex items-center gap-3">
