@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, ArrowLeft, ShieldCheck, CheckCircle2, Info, AlertTriangle, CreditCard } from 'lucide-react';
+import { Loader2, ArrowLeft, Info, AlertTriangle, CreditCard } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 
@@ -49,9 +49,14 @@ export default function CheckoutPage() {
     setTotal(Number(savedTotal));
 
     async function loadEvent() {
-      const docSnap = await getDoc(doc(db, 'eventos', eventId as string));
-      if (docSnap.exists()) setEvent({ id: docSnap.id, ...docSnap.data() });
-      setLoading(false);
+      try {
+        const docSnap = await getDoc(doc(db, 'eventos', eventId as string));
+        if (docSnap.exists()) setEvent({ id: docSnap.id, ...docSnap.data() });
+      } catch (e) {
+        console.error("Erro ao carregar evento:", e);
+      } finally {
+        setLoading(false);
+      }
     }
     loadEvent();
   }, [eventId, router]);
@@ -84,7 +89,6 @@ export default function CheckoutPage() {
 
     setIsSubmitting(true);
     try {
-      // 1. Criar o pedido no Firestore primeiro (status pendente)
       const batch = writeBatch(db);
       const orderRef = doc(collection(db, 'pedidos'));
       
@@ -96,12 +100,11 @@ export default function CheckoutPage() {
         total: total / 100,
         status: total > 0 ? 'pendente' : 'pago',
         createdAt: serverTimestamp(),
-        paymentMethod: 'mercadopago_checkout'
+        paymentMethod: 'mercadopago_preference'
       };
 
       batch.set(orderRef, orderData);
 
-      // Atualizar estoque e preparar ingressos (eles ficam pendentes até o pagamento)
       for (const item of items) {
         const typeRef = doc(db, 'eventos', eventId as string, 'ticketTypes', item.id);
         batch.update(typeRef, { soldCount: increment(item.qty) });
@@ -124,7 +127,6 @@ export default function CheckoutPage() {
       await batch.commit();
 
       if (total > 0) {
-        // 2. Criar Preferência no Mercado Pago
         const response = await fetch('/api/mercadopago/create-preference', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -144,13 +146,11 @@ export default function CheckoutPage() {
           throw new Error(data.error);
         }
 
-        // Redirecionar para o Mercado Pago (sandbox se disponível)
         const paymentUrl = data.sandbox_init_point || data.init_point;
         localStorage.removeItem('checkout_items');
         localStorage.removeItem('checkout_total');
         window.location.href = paymentUrl;
       } else {
-        // Evento Gratuito
         localStorage.removeItem('checkout_items');
         localStorage.removeItem('checkout_total');
         router.push(`/pagamento/sucesso?orderId=${orderRef.id}`);
@@ -172,7 +172,7 @@ export default function CheckoutPage() {
       <main className="container mx-auto px-4 py-8 md:py-12">
         <div className="flex items-center gap-4 mb-8">
            <Button variant="ghost" size="icon" onClick={() => router.back()}><ArrowLeft className="h-5 w-5" /></Button>
-           <h1 className="text-3xl font-black font-headline tracking-tight">Pagamento Seguro</h1>
+           <h1 className="text-3xl font-black font-headline tracking-tight">Finalizar Compra</h1>
         </div>
 
         {errorMessage && (
@@ -189,8 +189,8 @@ export default function CheckoutPage() {
           <div className="lg:col-span-2 space-y-6">
             <Card className="border-none shadow-sm">
               <CardHeader>
-                <CardTitle className="font-headline text-xl">Identificação do Participante</CardTitle>
-                <CardDescription>Estes dados serão usados para gerar seu ingresso.</CardDescription>
+                <CardTitle className="font-headline text-xl">Seus Dados</CardTitle>
+                <CardDescription>Preencha os dados do participante para gerar os ingressos.</CardDescription>
               </CardHeader>
               <CardContent>
                 <form id="checkout-form" onSubmit={handleFinish} className="space-y-4">
@@ -215,7 +215,7 @@ export default function CheckoutPage() {
             <Alert className="bg-blue-50 border-blue-200">
               <Info className="h-4 w-4 text-blue-600" />
               <AlertDescription className="text-xs text-blue-700">
-                Você será redirecionado para o ambiente seguro do Mercado Pago para escolher a forma de pagamento (PIX, Cartão ou Boleto).
+                Você será redirecionado para o Mercado Pago para pagar via <strong>PIX, Cartão ou Boleto</strong> com total segurança.
               </AlertDescription>
             </Alert>
           </div>
@@ -223,7 +223,7 @@ export default function CheckoutPage() {
           <div className="space-y-6">
             <Card className="border-none shadow-xl sticky top-24 overflow-hidden">
               <CardHeader className="bg-primary text-white">
-                <CardTitle className="font-headline">Resumo da Compra</CardTitle>
+                <CardTitle className="font-headline">Resumo</CardTitle>
               </CardHeader>
               <CardContent className="p-6 space-y-4">
                    {items.map((item, idx) => (
@@ -240,7 +240,7 @@ export default function CheckoutPage() {
               <CardFooter className="p-6 pt-0">
                  <Button form="checkout-form" type="submit" disabled={isSubmitting} className="w-full bg-secondary hover:bg-secondary/90 text-white font-black h-16 text-xl rounded-2xl shadow-lg shadow-secondary/20 transition-all active:scale-95 group">
                    {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : <CreditCard className="mr-2 h-6 w-6 group-hover:scale-110 transition-transform" />}
-                   PAGAR AGORA
+                   CONFIRMAR E PAGAR
                  </Button>
               </CardFooter>
             </Card>

@@ -4,9 +4,9 @@ import MercadoPagoConfig, { Preference } from 'mercadopago';
 
 export async function POST(req: Request) {
   try {
-    const token = (process.env.MERCADO_PAGO_ACCESS_TOKEN || '').trim();
+    const token = (process.env.MERCADOPAGO_ACCESS_TOKEN || process.env.MERCADO_PAGO_ACCESS_TOKEN || '').trim();
 
-    if (!token) {
+    if (!token || token === 'SEU_TOKEN_DE_TESTE_AQUI') {
       return NextResponse.json(
         { error: 'Token do Mercado Pago não configurado no .env' },
         { status: 500 }
@@ -61,7 +61,7 @@ export async function POST(req: Request) {
   } catch (err: any) {
     console.error('Erro ao criar preferência MP:', err);
     return NextResponse.json(
-      { error: 'Erro ao processar checkout. Verifique suas credenciais.' }, 
+      { error: err.message || 'Erro ao processar checkout.' }, 
       { status: 500 }
     );
   }
