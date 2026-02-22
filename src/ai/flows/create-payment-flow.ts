@@ -30,41 +30,42 @@ const createPaymentFlow = ai.defineFlow(
     inputSchema: CreatePaymentInputSchema,
   },
   async (input) => {
-    const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
+    // Remove espaços em branco que podem vir de um copiar e colar mal feito
+    const accessToken = (process.env.MERCADO_PAGO_ACCESS_TOKEN || '').trim();
 
-    if (!accessToken || accessToken === 'SEU_TOKEN_AQUI') {
-      throw new Error('CONFIGURAÇÃO NECESSÁRIA: Você precisa colar o seu Access Token do Mercado Pago no arquivo .env (MERCADO_PAGO_ACCESS_TOKEN).');
+    if (!accessToken || accessToken === 'SEU_TOKEN_AQUI' || accessToken === '') {
+      throw new Error('TOKEN NÃO ENCONTRADO: Verifique se você colou o seu Access Token no arquivo .env e salvou o arquivo.');
     }
 
-    const client = new MercadoPagoConfig({
-      accessToken: accessToken,
-      options: { timeout: 10000 } // Aumentado para evitar timeouts em conexões lentas
-    });
-
-    const payment = new Payment(client);
-    
-    // Divide o nome para os campos obrigatórios do MP
-    const nameParts = input.fullName.trim().split(' ');
-    const firstName = nameParts[0] || 'Participante';
-    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Beleza';
-
-    const body = {
-      transaction_amount: Number(input.amount.toFixed(2)),
-      description: input.description,
-      payment_method_id: 'pix',
-      payer: {
-        email: input.email,
-        first_name: firstName,
-        last_name: lastName,
-        identification: {
-          type: 'CPF',
-          number: input.identificationNumber.replace(/\D/g, ''),
-        },
-      },
-      installments: 1,
-    };
-
     try {
+      const client = new MercadoPagoConfig({
+        accessToken: accessToken,
+        options: { timeout: 15000 }
+      });
+
+      const payment = new Payment(client);
+      
+      // Divide o nome para os campos obrigatórios do MP
+      const nameParts = input.fullName.trim().split(' ');
+      const firstName = nameParts[0] || 'Participante';
+      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Beleza';
+
+      const body = {
+        transaction_amount: Number(input.amount.toFixed(2)),
+        description: input.description,
+        payment_method_id: 'pix',
+        payer: {
+          email: input.email,
+          first_name: firstName,
+          last_name: lastName,
+          identification: {
+            type: 'CPF',
+            number: input.identificationNumber.replace(/\D/g, ''),
+          },
+        },
+        installments: 1,
+      };
+
       const response = await payment.create({ body });
       
       return {
@@ -76,8 +77,13 @@ const createPaymentFlow = ai.defineFlow(
         ticket_url: response.point_of_interaction?.transaction_data?.ticket_url,
       };
     } catch (error: any) {
-      console.error('Erro detalhado Mercado Pago:', error.message || error);
-      // Erro amigável para o usuário final
+      console.error('Erro detalhado Mercado Pago:', error);
+      
+      // Trata erros específicos de credenciais
+      if (error.message?.includes('access_token')) {
+        throw new Error('Token Inválido: O token configurado no .env não é reconhecido pelo Mercado Pago.');
+      }
+
       const errorMessage = error.cause?.[0]?.description || error.message || 'Erro ao processar PIX.';
       throw new Error(`Mercado Pago: ${errorMessage}`);
     }
