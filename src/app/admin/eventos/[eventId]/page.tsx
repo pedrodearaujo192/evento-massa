@@ -12,7 +12,8 @@ import {
   serverTimestamp,
   Timestamp,
   where,
-  writeBatch
+  writeBatch,
+  addDoc
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
@@ -65,7 +66,8 @@ import {
   Save,
   ImageIcon,
   Eye,
-  RotateCcw
+  RotateCcw,
+  PlusCircle
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -114,6 +116,9 @@ export default function ManageEventPage() {
   const [isAddingGuest, setIsAddingGuest] = useState(false);
   const [isGuestModalOpen, setIsGuestModalOpen] = useState(false);
   
+  const [isAddingTicketType, setIsAddingTicketType] = useState(false);
+  const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
+  
   // States for Editing
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
@@ -141,7 +146,6 @@ export default function ManageEventPage() {
       query(collection(db, 'ingressos'), where('eventId', '==', eventId)),
       (snapshot) => {
         const ticketsData = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as EventTicket));
-        // Sort in client side to avoid index requirement error
         ticketsData.sort((a, b) => {
             const dateA = a.createdAt?.toMillis() || 0;
             const dateB = b.createdAt?.toMillis() || 0;
@@ -173,6 +177,33 @@ export default function ManageEventPage() {
       toast({ title: 'Evento publicado!', description: 'O evento agora está visível para o público.' });
     } finally {
       setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleAddTicketType = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsAddingTicketType(true);
+    const formData = new FormData(e.currentTarget);
+    
+    try {
+      await addDoc(collection(db, 'eventos', eventId as string, 'ticketTypes'), {
+        name: formData.get('name'),
+        description: formData.get('description') || '',
+        priceType: formData.get('priceType'),
+        priceCents: formData.get('priceType') === 'free' ? 0 : Math.round(Number(formData.get('price')) * 100),
+        quantity: Number(formData.get('quantity')),
+        soldCount: 0,
+        active: true,
+        salesStartAt: serverTimestamp(),
+        salesEndAt: event.endAt || serverTimestamp(),
+        createdAt: serverTimestamp()
+      });
+      setIsTicketModalOpen(false);
+      toast({ title: 'Sucesso', description: 'Novo lote de ingressos criado.' });
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível criar o lote.' });
+    } finally {
+      setIsAddingTicketType(false);
     }
   };
 
@@ -266,7 +297,6 @@ export default function ManageEventPage() {
         updateData.coverUrl = coverUrl;
         updateData.coverPath = coverPath;
         
-        // Remove old image if exists
         if (event.coverPath) {
           try { await deleteObject(ref(storage, event.coverPath)); } catch (e) {}
         }
@@ -333,8 +363,8 @@ export default function ManageEventPage() {
               </Badge>
               <span className="text-xs text-muted-foreground uppercase tracking-wider">{event.category}</span>
             </div>
-            <h1 className="text-3xl font-black font-headline tracking-tight">
-               <span className="text-secondary">Gerenciar:</span> {event.title}
+            <h1 className="text-3xl font-black font-headline tracking-tight text-foreground">
+               {event.title}
             </h1>
           </div>
         </div>
@@ -361,7 +391,7 @@ export default function ManageEventPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Documento (CPF/CNPJ)</Label>
-                  <Input name="document" required />
+                  <Input name="document" placeholder="000.000.000-00" required />
                 </div>
                 <div className="space-y-2">
                   <Label>Tipo de Ingresso</Label>
@@ -380,7 +410,7 @@ export default function ManageEventPage() {
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList className="bg-muted/50 p-1 rounded-lg">
           <TabsTrigger value="overview" className="gap-2"><BarChart3 className="h-4 w-4" /> Visão Geral</TabsTrigger>
-          <TabsTrigger value="tickets" className="gap-2"><Ticket className="h-4 w-4" /> Lotes</TabsTrigger>
+          <TabsTrigger value="tickets" className="gap-2"><Ticket className="h-4 w-4" /> Ingressos</TabsTrigger>
           <TabsTrigger value="participants" className="gap-2"><Users className="h-4 w-4" /> Participantes</TabsTrigger>
           <TabsTrigger value="checkin" className="gap-2"><UserCheck className="h-4 w-4" /> Check-in</TabsTrigger>
           <TabsTrigger value="settings" className="gap-2"><Settings className="h-4 w-4" /> Configurações</TabsTrigger>
@@ -390,7 +420,7 @@ export default function ManageEventPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="border-none shadow-sm"><CardHeader className="pb-2 text-muted-foreground text-sm font-bold">VENDIDOS</CardHeader><CardContent><div className="text-3xl font-black">{totalSold} / {totalCapacity}</div></CardContent></Card>
             <Card className="border-none shadow-sm"><CardHeader className="pb-2 text-muted-foreground text-sm font-bold">PRESENÇA</CardHeader><CardContent><div className="text-3xl font-black">{totalCheckIns} ({totalSold > 0 ? Math.round((totalCheckIns/totalSold)*100) : 0}%)</div></CardContent></Card>
-            <Card className="border-none shadow-sm"><CardHeader className="pb-2 text-muted-foreground text-sm font-bold">RECEITA ESTIMADA</CardHeader><CardContent><div className="text-3xl font-black text-secondary">R$ {tickets.length > 0 ? '---' : '0,00'}</div></CardContent></Card>
+            <Card className="border-none shadow-sm"><CardHeader className="pb-2 text-muted-foreground text-sm font-bold">Faturamento (Manual/Pix)</CardHeader><CardContent><div className="text-3xl font-black text-secondary">---</div></CardContent></Card>
           </div>
 
           <Card className="border-none shadow-sm">
@@ -450,11 +480,15 @@ export default function ManageEventPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href={`/ingressos/${t.orderId}`} target="_blank">
-                          <Eye className="mr-2 h-4 w-4" /> VER INGRESSO
-                        </Link>
-                      </Button>
+                      {t.orderId ? (
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/ingressos/${t.orderId}`} target="_blank">
+                            <Eye className="mr-2 h-4 w-4" /> VER INGRESSO
+                          </Link>
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">Sem Pedido</span>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -506,6 +540,11 @@ export default function ManageEventPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right flex items-center justify-end gap-2">
+                      <Button variant="outline" size="icon" asChild title="Ver Ingresso">
+                        <Link href={`/ingressos/${t.orderId}`} target="_blank">
+                          <Eye className="h-4 w-4" />
+                        </Link>
+                      </Button>
                       {t.status !== 'usado' ? (
                         <Button size="sm" onClick={() => handleCheckIn(t.id)} className="bg-secondary text-white font-bold">
                           <UserCheck className="mr-2 h-4 w-4" /> CONFIRMAR
@@ -531,7 +570,45 @@ export default function ManageEventPage() {
         <TabsContent value="tickets" className="space-y-6">
            <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold font-headline">Lotes e Preços</h2>
-              <Button><Plus className="mr-2 h-4 w-4" /> Adicionar Lote</Button>
+              <Dialog open={isTicketModalOpen} onOpenChange={setIsTicketModalOpen}>
+                <DialogTrigger asChild>
+                  <Button className="font-bold"><PlusCircle className="mr-2 h-4 w-4" /> CRIAR NOVO LOTE</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader><DialogTitle>Configurar Lote de Ingressos</DialogTitle></DialogHeader>
+                  <form onSubmit={handleAddTicketType} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Nome do Lote</Label>
+                      <Input name="name" placeholder="Ex: Lote Promocional / VIP" required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Tipo de Preço</Label>
+                      <select name="priceType" className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm" required>
+                        <option value="paid">Pago</option>
+                        <option value="free">Grátis</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Preço (R$)</Label>
+                      <Input name="price" type="number" step="0.01" placeholder="0.00" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Quantidade Disponível</Label>
+                      <Input name="quantity" type="number" placeholder="100" required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Descrição (Opcional)</Label>
+                      <Textarea name="description" placeholder="O que este ingresso inclui?" />
+                    </div>
+                    <DialogFooter>
+                      <Button type="submit" disabled={isAddingTicketType} className="w-full">
+                        {isAddingTicketType && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        SALVAR LOTE
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
            </div>
            <Card className="border-none shadow-sm overflow-hidden">
               <Table>
@@ -558,6 +635,11 @@ export default function ManageEventPage() {
                       </TableCell>
                     </TableRow>
                   ))}
+                  {ticketTypes.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground italic">Nenhum lote criado ainda.</TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
            </Card>
@@ -610,6 +692,10 @@ export default function ManageEventPage() {
                           required 
                         />
                       </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Capacidade Geral</Label>
+                      <Input name="capacity" type="number" defaultValue={event.capacity} required />
                     </div>
                   </div>
 
