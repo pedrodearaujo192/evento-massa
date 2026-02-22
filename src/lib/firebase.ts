@@ -8,7 +8,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyAz72cOTzdZ1E1iRNEVcZ85xvyBfWY85T4",
   authDomain: "layrse-eventos.firebaseapp.com",
   projectId: "layrse-eventos",
-  storageBucket: "layrse-eventos.appspot.com",
+  storageBucket: "layrse-eventos.firebasestorage.app",
   messagingSenderId: "613148094014",
   appId: "1:613148094014:web:422b3898cb5f4543a46b6f",
   measurementId: "G-TPR3K1K55B"
