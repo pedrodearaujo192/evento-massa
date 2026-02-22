@@ -8,24 +8,29 @@ import {
   onSnapshot, 
   collection, 
   query, 
-  addDoc, 
   updateDoc, 
   serverTimestamp,
   Timestamp,
   where,
-  getDocs,
-  orderBy,
   writeBatch
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { db, storage } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@//components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { 
   Table, 
   TableBody, 
@@ -54,10 +59,11 @@ import {
   ArrowLeft,
   Edit,
   CheckCircle2,
-  Clock,
   Search,
   UserCheck,
-  QrCode
+  Upload,
+  Save,
+  ImageIcon
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -103,10 +109,12 @@ export default function ManageEventPage() {
   
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isAddingGuest, setIsAddingGuest] = useState(false);
-  const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
   const [isGuestModalOpen, setIsGuestModalOpen] = useState(false);
-  const [editingTicket, setEditingTicket] = useState<TicketType | null>(null);
-  const [isSavingTicket, setIsSavingTicket] = useState(false);
+  
+  // States for Editing
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [editImageFile, setEditImageFile] = useState<File | null>(null);
+  const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
 
   useEffect(() => {
     if (!eventId || !user) return;
@@ -126,12 +134,10 @@ export default function ManageEventPage() {
       }
     );
 
-    // ✅ Removido o orderBy para evitar erro de índice ausente no Firestore
     const unsubTickets = onSnapshot(
       query(collection(db, 'ingressos'), where('eventId', '==', eventId)),
       (snapshot) => {
         const ticketsData = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as EventTicket));
-        // Ordenação manual no lado do cliente
         ticketsData.sort((a, b) => {
             const dateA = a.createdAt?.toMillis() || 0;
             const dateB = b.createdAt?.toMillis() || 0;
@@ -175,8 +181,6 @@ export default function ManageEventPage() {
 
     try {
       const batch = writeBatch(db);
-      
-      // 1. Criar o pedido manual
       const orderRef = doc(collection(db, 'pedidos'));
       batch.set(orderRef, {
         eventId,
@@ -201,7 +205,6 @@ export default function ManageEventPage() {
         type: 'manual'
       });
 
-      // 2. Criar o ingresso com QR Code
       const ticketRef = doc(collection(db, 'ingressos'));
       batch.set(ticketRef, {
         orderId: orderRef.id,
@@ -214,21 +217,65 @@ export default function ManageEventPage() {
         createdAt: serverTimestamp()
       });
 
-      // 3. Atualizar contador no ticketType
       const typeRef = doc(db, 'eventos', eventId as string, 'ticketTypes', ticketTypeId);
       batch.update(typeRef, {
         soldCount: (selectedTicketType?.soldCount || 0) + 1
       });
 
       await batch.commit();
-
       setIsGuestModalOpen(false);
       toast({ title: 'Sucesso', description: 'Convidado adicionado com sucesso.' });
     } catch (error) {
-      console.error(error);
       toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível adicionar o convidado.' });
     } finally {
       setIsAddingGuest(false);
+    }
+  };
+
+  const handleUpdateEvent = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsSavingEdit(true);
+    const formData = new FormData(e.currentTarget);
+    
+    try {
+      const updateData: any = {
+        title: formData.get('title'),
+        description: formData.get('description'),
+        category: formData.get('category'),
+        city: formData.get('city'),
+        state: formData.get('state'),
+        address: formData.get('address'),
+        capacity: Number(formData.get('capacity')),
+        startAt: formData.get('startAt') ? Timestamp.fromDate(new Date(formData.get('startAt') as string)) : event.startAt,
+        endAt: formData.get('endAt') ? Timestamp.fromDate(new Date(formData.get('endAt') as string)) : event.endAt,
+        updatedAt: serverTimestamp(),
+      };
+
+      if (editImageFile) {
+        const safeName = editImageFile.name.replace(/[^a-zA-Z0-9._-]/g, '-').toLowerCase();
+        const coverPath = `eventos/${eventId}/capa/cover-${Date.now()}-${safeName}`;
+        const imageRef = ref(storage, coverPath);
+        
+        const snap = await uploadBytes(imageRef, editImageFile);
+        const coverUrl = await getDownloadURL(snap.ref);
+        
+        updateData.coverUrl = coverUrl;
+        updateData.coverPath = coverPath;
+        
+        // Remove old image if exists
+        if (event.coverPath) {
+          try { await deleteObject(ref(storage, event.coverPath)); } catch (e) {}
+        }
+      }
+
+      await updateDoc(doc(db, 'eventos', eventId as string), updateData);
+      setEditImageFile(null);
+      setEditImagePreview(null);
+      toast({ title: 'Evento atualizado!', description: 'As alterações foram salvas com sucesso.' });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Erro ao salvar', description: error.message });
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -253,7 +300,7 @@ export default function ManageEventPage() {
   }, [tickets, searchTerm]);
 
   const totalSold = useMemo(() => tickets.length, [tickets]);
-  const totalCapacity = useMemo(() => ticketTypes.reduce((acc, t) => acc + t.quantity, 0), [ticketTypes]);
+  const totalCapacity = useMemo(() => ticketTypes.reduce((acc, t) => acc + t.quantity, 0) || event?.capacity || 0, [ticketTypes, event]);
   const totalCheckIns = useMemo(() => tickets.filter(t => t.status === 'usado').length, [tickets]);
 
   if (loading || !event) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
@@ -320,13 +367,14 @@ export default function ManageEventPage() {
           <TabsTrigger value="tickets" className="gap-2"><Ticket className="h-4 w-4" /> Ingressos</TabsTrigger>
           <TabsTrigger value="checkin" className="gap-2"><UserCheck className="h-4 w-4" /> Check-in</TabsTrigger>
           <TabsTrigger value="participants" className="gap-2"><Users className="h-4 w-4" /> Participantes</TabsTrigger>
+          <TabsTrigger value="settings" className="gap-2"><Settings className="h-4 w-4" /> Configurações</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="border-none shadow-sm"><CardHeader className="pb-2 text-muted-foreground text-sm font-bold">VENDIDOS</CardHeader><CardContent><div className="text-3xl font-black">{totalSold} / {totalCapacity}</div></CardContent></Card>
             <Card className="border-none shadow-sm"><CardHeader className="pb-2 text-muted-foreground text-sm font-bold">PRESENÇA</CardHeader><CardContent><div className="text-3xl font-black">{totalCheckIns} ({totalSold > 0 ? Math.round((totalCheckIns/totalSold)*100) : 0}%)</div></CardContent></Card>
-            <Card className="border-none shadow-sm"><CardHeader className="pb-2 text-muted-foreground text-sm font-bold">RECEITA</CardHeader><CardContent><div className="text-3xl font-black text-secondary">R$ {(tickets.length * 0).toFixed(2)}</div></CardContent></Card>
+            <Card className="border-none shadow-sm"><CardHeader className="pb-2 text-muted-foreground text-sm font-bold">RECEITA</CardHeader><CardContent><div className="text-3xl font-black text-secondary">R$ {tickets.reduce((acc, t) => acc + (0), 0).toFixed(2)}</div></CardContent></Card>
           </div>
 
           <Card className="border-none shadow-sm">
@@ -408,7 +456,7 @@ export default function ManageEventPage() {
         <TabsContent value="tickets" className="space-y-6">
            <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold font-headline">Lotes e Preços</h2>
-              <Button onClick={() => { setEditingTicket(null); setIsTicketModalOpen(true); }}><Plus className="mr-2 h-4 w-4" /> Adicionar Lote</Button>
+              <Button><Plus className="mr-2 h-4 w-4" /> Adicionar Lote</Button>
            </div>
            <Card className="border-none shadow-sm overflow-hidden">
               <Table>
@@ -431,13 +479,135 @@ export default function ManageEventPage() {
                       <TableCell>{t.soldCount}</TableCell>
                       <TableCell><Badge variant={t.active ? 'default' : 'outline'}>{t.active ? 'ATIVO' : 'INATIVO'}</Badge></TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => { setEditingTicket(t); setIsTicketModalOpen(true); }}><Edit className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon"><Edit className="h-4 w-4" /></Button>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
            </Card>
+        </TabsContent>
+
+        <TabsContent value="settings" className="space-y-6">
+          <Card className="border-none shadow-sm">
+            <CardHeader>
+              <CardTitle>Editar Evento</CardTitle>
+              <CardDescription>Atualize as informações principais e a capa do seu evento.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleUpdateEvent} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Título do Evento</Label>
+                      <Input name="title" defaultValue={event.title} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Categoria</Label>
+                      <Select name="category" defaultValue={event.category}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Workshop">Workshop</SelectItem>
+                          <SelectItem value="Curso">Curso</SelectItem>
+                          <SelectItem value="Masterclass">Masterclass</SelectItem>
+                          <SelectItem value="Congresso">Congresso</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Data Início</Label>
+                        <Input 
+                          name="startAt" 
+                          type="datetime-local" 
+                          defaultValue={event.startAt ? format(event.startAt.toDate(), "yyyy-MM-dd'T'HH:mm") : ''} 
+                          required 
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Data Término</Label>
+                        <Input 
+                          name="endAt" 
+                          type="datetime-local" 
+                          defaultValue={event.endAt ? format(event.endAt.toDate(), "yyyy-MM-dd'T'HH:mm") : ''} 
+                          required 
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <Label>Capa do Evento</Label>
+                    <div className="relative aspect-video rounded-xl overflow-hidden border-2 border-dashed group">
+                      {editImagePreview || event.coverUrl ? (
+                        <>
+                          <Image 
+                            src={editImagePreview || event.coverUrl} 
+                            alt="Preview" 
+                            fill 
+                            className="object-cover"
+                          />
+                          <label className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                            <div className="text-white flex flex-col items-center">
+                              <Upload className="h-8 w-8 mb-2" />
+                              <span className="font-bold">Alterar Imagem</span>
+                            </div>
+                            <input 
+                              type="file" 
+                              className="hidden" 
+                              accept="image/*" 
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  setEditImageFile(file);
+                                  setEditImagePreview(URL.createObjectURL(file));
+                                }
+                              }}
+                            />
+                          </label>
+                        </>
+                      ) : (
+                        <label className="flex flex-col items-center justify-center h-full cursor-pointer">
+                          <ImageIcon className="h-10 w-10 text-muted-foreground mb-2" />
+                          <span className="text-sm text-muted-foreground">Clique para subir</span>
+                          <input type="file" className="hidden" />
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Descrição Completa</Label>
+                  <Textarea name="description" defaultValue={event.description} className="min-h-[200px]" required />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <Label>Endereço</Label>
+                    <Input name="address" defaultValue={event.address} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Cidade</Label>
+                    <Input name="city" defaultValue={event.city} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Estado (UF)</Label>
+                    <Input name="state" defaultValue={event.state} maxLength={2} required />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-4 pt-4 border-t">
+                  <Button type="submit" disabled={isSavingEdit} className="bg-secondary text-white font-bold px-10 h-12">
+                    {isSavingEdit ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    SALVAR ALTERAÇÕES
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
