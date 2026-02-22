@@ -16,18 +16,31 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { useToast } from '@/hooks/use-toast';
 
-// Helper para garantir que todas as imagens no elemento foram carregadas
+// Helper para garantir que todas as imagens no elemento foram carregadas e decodificadas
 async function waitForImages(root: HTMLElement) {
   const imgs = Array.from(root.querySelectorAll("img"));
+
   await Promise.all(
-    imgs.map((img) =>
-      img.complete
-        ? Promise.resolve()
-        : new Promise<void>((resolve) => {
-            img.onload = () => resolve();
-            img.onerror = () => resolve();
-          })
-    )
+    imgs.map(async (img) => {
+      if (!img.complete) {
+        await new Promise<void>((resolve) => {
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+        });
+      }
+      try {
+        // @ts-ignore
+        if (img.decode) await img.decode();
+      } catch (e) {
+        console.warn("Erro ao decodificar imagem:", e);
+      }
+    })
+  );
+}
+
+function nextFrame() {
+  return new Promise<void>((resolve) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
   );
 }
 
@@ -80,11 +93,18 @@ export default function OrderTicketsPage() {
     toast({ title: 'Gerando PDF...', description: 'Processando seu ingresso em alta qualidade.' });
 
     try {
-      // Ativa modo PDF para remover sombras e animações que bugam o canvas
-      element.classList.add('pdf-mode');
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      await waitForImages(element);
+      // 1) Garante fontes e layout estabilizados
+      if (typeof window !== "undefined" && "fonts" in document) {
+        // @ts-ignore
+        await document.fonts.ready;
+      }
+      await nextFrame();
 
+      // 2) Garante imagens carregadas e decodificadas
+      await waitForImages(element);
+      await nextFrame();
+
+      // 3) Captura
       const canvas = await html2canvas(element, {
         scale: 3,
         useCORS: true,
@@ -92,9 +112,24 @@ export default function OrderTicketsPage() {
         backgroundColor: "#ffffff",
         scrollX: 0,
         scrollY: 0,
+        onclone: (doc) => {
+          const cloned = doc.querySelector(`[data-ticket-id="${ticketId}"]`) as HTMLElement | null;
+          if (!cloned) return;
+
+          // Remove animações/transforms durante export
+          cloned.querySelectorAll("*").forEach((el) => {
+            const h = el as HTMLElement;
+            if (h.style) {
+              h.style.animation = "none";
+              h.style.transition = "none";
+              h.style.transform = "none";
+            }
+          });
+        },
       });
 
-      const imgData = canvas.toDataURL("image/png");
+      // 4) JPEG evita artefatos de PNG no PDF
+      const imgData = canvas.toDataURL("image/jpeg", 0.98);
 
       const pdf = new jsPDF({
         orientation: "portrait",
@@ -120,7 +155,7 @@ export default function OrderTicketsPage() {
       const x = (pageW - imgW) / 2;
       const y = (pageH - imgH) / 2;
 
-      pdf.addImage(imgData, "PNG", x, y, imgW, imgH, undefined, 'FAST');
+      pdf.addImage(imgData, "JPEG", x, y, imgW, imgH);
       pdf.save(`ingresso-${ticketId}.pdf`);
 
       toast({ title: "Pronto!", description: "Seu ingresso foi baixado com sucesso." });
@@ -128,7 +163,6 @@ export default function OrderTicketsPage() {
       console.error("Erro ao gerar PDF:", error);
       toast({ variant: "destructive", title: "Erro ao baixar", description: "Falha ao gerar o arquivo PDF." });
     } finally {
-      element.classList.remove('pdf-mode');
       setDownloadingId(null);
     }
   };
@@ -155,31 +189,48 @@ export default function OrderTicketsPage() {
         <div className="flex flex-wrap gap-12 justify-center">
           {tickets.map((ticket) => (
             <div key={ticket.id} className="flex flex-col gap-6 items-center max-w-[400px] w-full">
-              {/* Card do Ingresso Vertical Profissional */}
+              {/* Card do Ingresso Vertical Profissional - Layout Novo */}
               <Card 
                 ref={(el) => { ticketRefs.current[ticket.id] = el; }}
+                data-ticket-id={ticket.id}
                 className="w-full border-none shadow-[0_30px_60px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col bg-white rounded-[2rem] relative"
               >
-                {/* Imagem de Capa do Evento com Gradiente */}
-                <div className="relative h-56 w-full">
+                {/* Header: Imagem Limpa */}
+                <div className="relative h-56 w-full bg-black">
                     <Image 
                       src={event?.coverUrl || "https://picsum.photos/seed/event/800/600"} 
                       alt="Capa do Evento" 
                       fill 
                       className="object-cover"
+                      unoptimized
+                      crossOrigin="anonymous"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent flex flex-col justify-end p-8">
-                      <Badge className="bg-primary text-white border-none w-fit mb-3 shadow-lg font-black uppercase text-[10px] tracking-widest">
-                        {ticket.ticketName}
-                      </Badge>
-                      <h2 className="text-white font-black text-2xl font-headline leading-tight line-clamp-2">
-                        {event?.title}
-                      </h2>
-                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
                 </div>
                 
-                {/* Área de Informações */}
-                <div className="p-8 space-y-8 bg-white relative">
+                {/* Infos abaixo da imagem (zona segura pro PDF) */}
+                <div className="px-8 pt-7 pb-6 bg-white text-center">
+                  <div className="flex justify-center">
+                    <span 
+                      className="inline-flex items-center justify-center h-7 px-4 rounded-full bg-primary text-white text-[10px] font-black uppercase tracking-widest leading-none shadow-lg"
+                      style={{ lineHeight: "1" }}
+                    >
+                      {ticket.ticketName}
+                    </span>
+                  </div>
+                  <h2 
+                    className="mt-4 text-2xl font-black font-headline text-foreground leading-tight"
+                    style={{ paddingBottom: "2px", textRendering: "geometricPrecision" }}
+                  >
+                    {event?.title}
+                  </h2>
+                  
+                  {/* Divisor Visual */}
+                  <div className="mt-5 h-px w-full bg-muted/60" />
+                </div>
+
+                {/* Área de Informações Detalhadas */}
+                <div className="px-8 pb-8 space-y-8 bg-white relative">
                     <div className="grid grid-cols-2 gap-8">
                       <div className="space-y-1">
                         <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">DATA DO EVENTO</p>
@@ -220,7 +271,7 @@ export default function OrderTicketsPage() {
                     </div>
                 </div>
 
-                {/* Área do QR Code com Fundo Destacado */}
+                {/* Área do QR Code */}
                 <div className="p-10 bg-muted/5 flex flex-col items-center justify-center space-y-6 pt-12">
                     <div className="bg-white p-5 rounded-3xl shadow-2xl border-4 border-white">
                        <Image 
@@ -229,6 +280,8 @@ export default function OrderTicketsPage() {
                          width={180}
                          height={180}
                          className="object-contain"
+                         unoptimized
+                         crossOrigin="anonymous"
                        />
                     </div>
                     
