@@ -1,15 +1,17 @@
+
 'use client';
 
 import React from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
-import { Loader2, ShieldCheck, Calendar, PlusCircle } from 'lucide-react';
+import { Loader2, ShieldCheck, Calendar, PlusCircle, LayoutDashboard, Settings } from 'lucide-react';
 import { DashboardLayout } from '@/components/dashboard-layout';
 
 const navItems = [
-  { href: '/super-admin', label: 'Início', icon: ShieldCheck, tooltip: 'Visão Geral' },
-  { href: '/super-admin/admins', label: 'Administradores', icon: ShieldCheck, tooltip: 'Gerenciar Admins' },
-  { href: '/super-admin/events', label: 'Todos Eventos', icon: Calendar, tooltip: 'Ver Eventos' },
+  { href: '/super-admin', label: 'Início', icon: LayoutDashboard, tooltip: 'Visão Geral do Sistema' },
+  { href: '/dashboard', label: 'Meus Eventos', icon: Calendar, tooltip: 'Meus Eventos Pessoais' },
+  { href: '/super-admin/events', label: 'Todos Eventos', icon: Settings, tooltip: 'Gerenciar Todos os Eventos' },
+  { href: '/super-admin/admins', label: 'Administradores', icon: ShieldCheck, tooltip: 'Gerenciar Organizadores' },
   { href: '/admin/eventos/novo', label: 'Criar Evento', icon: PlusCircle, tooltip: 'Criar Novo Evento' },
 ];
 
