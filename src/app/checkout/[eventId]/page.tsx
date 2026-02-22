@@ -11,11 +11,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, ArrowLeft, ShieldCheck, CheckCircle2, Copy, Info, AlertTriangle } from 'lucide-react';
+import { Loader2, ArrowLeft, ShieldCheck, CheckCircle2, Info, AlertTriangle, CreditCard } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
-import { createPayment } from '@/ai/flows/create-payment-flow';
-import Image from 'next/image';
 
 export default function CheckoutPage() {
   const { eventId } = useParams();
@@ -27,8 +25,6 @@ export default function CheckoutPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [orderComplete, setOrderComplete] = useState<string | null>(null);
-  const [paymentData, setPaymentData] = useState<any>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
@@ -74,7 +70,6 @@ export default function CheckoutPage() {
       ...prev,
       [name]: name === 'document' ? maskDocument(value) : value
     }));
-    // Limpa erro ao digitar
     if (errorMessage) setErrorMessage(null);
   };
 
@@ -82,50 +77,32 @@ export default function CheckoutPage() {
     e.preventDefault();
     setErrorMessage(null);
 
-    // Validação extra de Nome Completo para o Mercado Pago
     if (!formData.fullName.trim().includes(' ')) {
       setErrorMessage('Por favor, insira seu nome completo (Nome e Sobrenome).');
       return;
     }
 
-    if (formData.document.replace(/\D/g, '').length < 11) {
-      setErrorMessage('CPF inválido. Insira os 11 números.');
-      return;
-    }
-
     setIsSubmitting(true);
     try {
-      let mpPayment = null;
-      if (total > 0) {
-        // Tenta criar o pagamento no Mercado Pago
-        mpPayment = await createPayment({
-          amount: total / 100,
-          email: formData.email.trim(),
-          description: `Ingressos: ${event?.title || 'Evento'}`,
-          fullName: formData.fullName.trim(),
-          identificationNumber: formData.document.replace(/\D/g, ''),
-        });
-        setPaymentData(mpPayment);
-      }
-
-      // Se o pagamento no MP funcionou (ou é free), cria o pedido no Firestore
+      // 1. Criar o pedido no Firestore primeiro (status pendente)
       const batch = writeBatch(db);
       const orderRef = doc(collection(db, 'pedidos'));
       
-      batch.set(orderRef, {
+      const orderData = {
         eventId,
         userId: user?.uid || 'guest',
         customer: formData,
         items,
         total: total / 100,
         status: total > 0 ? 'pendente' : 'pago',
-        mercadoPagoId: mpPayment?.id || null,
-        createdAt: serverTimestamp()
-      });
+        createdAt: serverTimestamp(),
+        paymentMethod: 'mercadopago_checkout'
+      };
 
-      // Cria os ingressos individuais
+      batch.set(orderRef, orderData);
+
+      // Atualizar estoque e preparar ingressos (eles ficam pendentes até o pagamento)
       for (const item of items) {
-        // Atualiza contagem de vendidos
         const typeRef = doc(db, 'eventos', eventId as string, 'ticketTypes', item.id);
         batch.update(typeRef, { soldCount: increment(item.qty) });
         
@@ -137,7 +114,7 @@ export default function CheckoutPage() {
             userName: formData.fullName,
             userEmail: formData.email,
             ticketName: item.name,
-            status: 'ativo',
+            status: total > 0 ? 'pendente' : 'ativo',
             checkedInAt: null,
             createdAt: serverTimestamp()
           });
@@ -145,87 +122,49 @@ export default function CheckoutPage() {
       }
 
       await batch.commit();
-      setOrderComplete(orderRef.id);
-      localStorage.removeItem('checkout_items');
-      localStorage.removeItem('checkout_total');
+
+      if (total > 0) {
+        // 2. Criar Preferência no Mercado Pago
+        const response = await fetch('/api/mercadopago/create-preference', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId: orderRef.id,
+            title: `Ingressos: ${event?.title || 'Evento'}`,
+            quantity: 1,
+            unitPrice: total / 100,
+            buyerEmail: formData.email.trim(),
+            buyerName: formData.fullName.trim()
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        // Redirecionar para o Mercado Pago (sandbox se disponível)
+        const paymentUrl = data.sandbox_init_point || data.init_point;
+        localStorage.removeItem('checkout_items');
+        localStorage.removeItem('checkout_total');
+        window.location.href = paymentUrl;
+      } else {
+        // Evento Gratuito
+        localStorage.removeItem('checkout_items');
+        localStorage.removeItem('checkout_total');
+        router.push(`/pagamento/sucesso?orderId=${orderRef.id}`);
+      }
       
     } catch (e: any) {
       console.error('Erro no checkout:', e);
       setErrorMessage(e.message || 'Erro ao processar pagamento. Tente novamente.');
-      // Rola para o topo para ver a mensagem de erro
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    } finally {
       setIsSubmitting(false);
     }
   };
 
-  const copyPixCode = () => {
-    if (paymentData?.qr_code) {
-      navigator.clipboard.writeText(paymentData.qr_code);
-      toast({ title: 'Copiado!', description: 'Código PIX copiado com sucesso.' });
-    }
-  };
-
   if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
-
-  if (orderComplete) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-muted/20 p-4">
-        <Card className="max-w-md w-full text-center p-8 space-y-6 shadow-2xl border-none">
-           <div className="mx-auto w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
-              <CheckCircle2 className="h-12 w-12 text-green-600" />
-           </div>
-           <div className="space-y-2">
-              <h1 className="text-3xl font-black font-headline">Pedido Recebido!</h1>
-              <p className="text-muted-foreground">Pedido: <span className="font-mono text-primary font-bold">#{orderComplete.slice(-6).toUpperCase()}</span></p>
-           </div>
-           
-           {paymentData ? (
-             <div className="bg-muted/50 p-6 rounded-2xl border-2 border-dashed border-primary/20 space-y-6">
-                <div className="space-y-2">
-                  <p className="text-sm font-black uppercase tracking-widest text-primary">Pagamento via PIX</p>
-                  <p className="text-xs text-muted-foreground">Escaneie o QR Code ou copie o código abaixo.</p>
-                </div>
-                
-                {paymentData.qr_code_base64 && (
-                  <div className="bg-white p-4 rounded-xl shadow-inner mx-auto w-fit">
-                    <img 
-                      src={`data:image/png;base64,${paymentData.qr_code_base64}`} 
-                      alt="QR Code Pix" 
-                      className="w-48 h-48"
-                    />
-                  </div>
-                )}
-                
-                <div className="space-y-3">
-                  <div className="bg-white p-3 rounded-lg text-[10px] break-all font-mono border text-muted-foreground line-clamp-2 select-all">
-                    {paymentData.qr_code}
-                  </div>
-                  <Button onClick={copyPixCode} variant="secondary" className="w-full font-bold">
-                    <Copy className="mr-2 h-4 w-4" /> COPIAR CÓDIGO PIX
-                  </Button>
-                </div>
-                
-                <div className="pt-4 border-t border-primary/10 flex flex-col gap-3">
-                   <Button asChild variant="outline" className="w-full">
-                     <a href={`/ingressos/${orderComplete}`}>ACESSAR MEUS INGRESSOS</a>
-                   </Button>
-                </div>
-             </div>
-           ) : (
-             <div className="space-y-4">
-                <p className="text-muted-foreground">Sua inscrição foi confirmada com sucesso.</p>
-                <Button asChild className="w-full bg-primary hover:bg-primary/90 text-white font-bold h-12">
-                  <a href={`/ingressos/${orderComplete}`}>VER MEU INGRESSO</a>
-                </Button>
-             </div>
-           )}
-           
-           <Button variant="ghost" className="w-full font-bold" onClick={() => router.push('/')}>Voltar para a Home</Button>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-muted/10">
@@ -233,7 +172,7 @@ export default function CheckoutPage() {
       <main className="container mx-auto px-4 py-8 md:py-12">
         <div className="flex items-center gap-4 mb-8">
            <Button variant="ghost" size="icon" onClick={() => router.back()}><ArrowLeft className="h-5 w-5" /></Button>
-           <h1 className="text-3xl font-black font-headline tracking-tight">Checkout Seguro</h1>
+           <h1 className="text-3xl font-black font-headline tracking-tight">Pagamento Seguro</h1>
         </div>
 
         {errorMessage && (
@@ -250,8 +189,8 @@ export default function CheckoutPage() {
           <div className="lg:col-span-2 space-y-6">
             <Card className="border-none shadow-sm">
               <CardHeader>
-                <CardTitle className="font-headline text-xl">Seus Dados</CardTitle>
-                <CardDescription>Preencha os dados do participante.</CardDescription>
+                <CardTitle className="font-headline text-xl">Identificação do Participante</CardTitle>
+                <CardDescription>Estes dados serão usados para gerar seu ingresso.</CardDescription>
               </CardHeader>
               <CardContent>
                 <form id="checkout-form" onSubmit={handleFinish} className="space-y-4">
@@ -276,7 +215,7 @@ export default function CheckoutPage() {
             <Alert className="bg-blue-50 border-blue-200">
               <Info className="h-4 w-4 text-blue-600" />
               <AlertDescription className="text-xs text-blue-700">
-                Se estiver em modo de teste, use um CPF válido gerado e um e-mail diferente do seu cadastro no Mercado Pago.
+                Você será redirecionado para o ambiente seguro do Mercado Pago para escolher a forma de pagamento (PIX, Cartão ou Boleto).
               </AlertDescription>
             </Alert>
           </div>
@@ -284,7 +223,7 @@ export default function CheckoutPage() {
           <div className="space-y-6">
             <Card className="border-none shadow-xl sticky top-24 overflow-hidden">
               <CardHeader className="bg-primary text-white">
-                <CardTitle className="font-headline">Resumo</CardTitle>
+                <CardTitle className="font-headline">Resumo da Compra</CardTitle>
               </CardHeader>
               <CardContent className="p-6 space-y-4">
                    {items.map((item, idx) => (
@@ -299,8 +238,9 @@ export default function CheckoutPage() {
                    </div>
               </CardContent>
               <CardFooter className="p-6 pt-0">
-                 <Button form="checkout-form" type="submit" disabled={isSubmitting} className="w-full bg-secondary hover:bg-secondary/90 text-white font-black h-16 text-xl rounded-2xl shadow-lg shadow-secondary/20 transition-all active:scale-95">
-                   {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : 'FINALIZAR E PAGAR'}
+                 <Button form="checkout-form" type="submit" disabled={isSubmitting} className="w-full bg-secondary hover:bg-secondary/90 text-white font-black h-16 text-xl rounded-2xl shadow-lg shadow-secondary/20 transition-all active:scale-95 group">
+                   {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : <CreditCard className="mr-2 h-6 w-6 group-hover:scale-110 transition-transform" />}
+                   PAGAR AGORA
                  </Button>
               </CardFooter>
             </Card>
