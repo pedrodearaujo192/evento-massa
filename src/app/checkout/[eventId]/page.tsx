@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, ArrowLeft, ShieldCheck, CheckCircle2, Copy, Info } from 'lucide-react';
+import { Loader2, ArrowLeft, ShieldCheck, CheckCircle2, Copy, Info, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { createPayment } from '@/ai/flows/create-payment-flow';
@@ -29,12 +29,13 @@ export default function CheckoutPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderComplete, setOrderComplete] = useState<string | null>(null);
   const [paymentData, setPaymentData] = useState<any>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     fullName: '',
     document: '',
     email: '',
-    address: '',
+    address: 'Venda Online',
     city: '',
     zip: ''
   });
@@ -73,34 +74,41 @@ export default function CheckoutPage() {
       ...prev,
       [name]: name === 'document' ? maskDocument(value) : value
     }));
+    // Limpa erro ao digitar
+    if (errorMessage) setErrorMessage(null);
   };
 
   const handleFinish = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.fullName || !formData.document || !formData.email) {
-      toast({ variant: 'destructive', title: 'Campos obrigatórios', description: 'Preencha seus dados corretamente.' });
+    setErrorMessage(null);
+
+    if (!formData.fullName.trim().includes(' ')) {
+      setErrorMessage('Por favor, insira seu nome completo (Nome e Sobrenome).');
+      return;
+    }
+
+    if (formData.document.replace(/\D/g, '').length < 11) {
+      setErrorMessage('CPF inválido. Insira os 11 números.');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      // 1. Criar o pagamento no Mercado Pago primeiro (se for pago)
       let mpPayment = null;
       if (total > 0) {
         mpPayment = await createPayment({
           amount: total / 100,
-          email: formData.email,
-          description: `Ingressos para: ${event?.title || 'Evento'}`,
-          fullName: formData.fullName,
-          identificationNumber: formData.document,
+          email: formData.email.trim(),
+          description: `Ingressos: ${event?.title || 'Evento'}`,
+          fullName: formData.fullName.trim(),
+          identificationNumber: formData.document.replace(/\D/g, ''),
         });
         setPaymentData(mpPayment);
       }
 
       const batch = writeBatch(db);
-
-      // 2. Criar o pedido no Firestore
       const orderRef = doc(collection(db, 'pedidos'));
+      
       batch.set(orderRef, {
         eventId,
         userId: user?.uid || 'guest',
@@ -112,16 +120,10 @@ export default function CheckoutPage() {
         createdAt: serverTimestamp()
       });
 
-      // 3. Atualizar contadores de ingressos vendidos
       for (const item of items) {
         const typeRef = doc(db, 'eventos', eventId as string, 'ticketTypes', item.id);
-        batch.update(typeRef, {
-          soldCount: increment(item.qty)
-        });
+        batch.update(typeRef, { soldCount: increment(item.qty) });
         
-        // Geramos os ingressos apenas se for gratuito. 
-        // Se for pago, os ingressos devem ser gerados pelo sistema após confirmação via Webhook do MP (Webhook não implementado neste MVP).
-        // Para este protótipo, vamos gerar os ingressos imediatamente para que o usuário veja algo.
         for (let i = 0; i < item.qty; i++) {
           const ticketRef = doc(collection(db, 'ingressos'));
           batch.set(ticketRef, {
@@ -138,14 +140,14 @@ export default function CheckoutPage() {
       }
 
       await batch.commit();
-
       setOrderComplete(orderRef.id);
       localStorage.removeItem('checkout_items');
       localStorage.removeItem('checkout_total');
-      toast({ title: 'Pedido criado!', description: total > 0 ? 'Aguardando pagamento via PIX.' : 'Sua inscrição foi confirmada!' });
+      
     } catch (e: any) {
-      console.error(e);
-      toast({ variant: 'destructive', title: 'Erro no Pagamento', description: e.message || 'Não foi possível processar seu pedido com o Mercado Pago.' });
+      console.error('Erro no checkout:', e);
+      setErrorMessage(e.message || 'Erro ao processar pagamento. Tente novamente.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setIsSubmitting(false);
     }
@@ -176,7 +178,7 @@ export default function CheckoutPage() {
              <div className="bg-muted/50 p-6 rounded-2xl border-2 border-dashed border-primary/20 space-y-6">
                 <div className="space-y-2">
                   <p className="text-sm font-black uppercase tracking-widest text-primary">Pagamento via PIX</p>
-                  <p className="text-xs text-muted-foreground">Escaneie o QR Code para liberar seu ingresso instantaneamente.</p>
+                  <p className="text-xs text-muted-foreground">Escaneie o QR Code ou copie o código abaixo.</p>
                 </div>
                 
                 {paymentData.qr_code_base64 && (
@@ -199,12 +201,6 @@ export default function CheckoutPage() {
                 </div>
                 
                 <div className="pt-4 border-t border-primary/10 flex flex-col gap-3">
-                   <Alert className="bg-blue-50 border-blue-200 text-blue-700 p-3">
-                     <Info className="h-4 w-4" />
-                     <AlertDescription className="text-[10px]">
-                        Em ambiente de teste, você pode usar o simulador do Mercado Pago para pagar este PIX.
-                     </AlertDescription>
-                   </Alert>
                    <Button asChild variant="outline" className="w-full">
                      <a href={`/ingressos/${orderComplete}`}>ACESSAR MEUS INGRESSOS</a>
                    </Button>
@@ -212,7 +208,7 @@ export default function CheckoutPage() {
              </div>
            ) : (
              <div className="space-y-4">
-                <p className="text-muted-foreground">Sua inscrição gratuita foi confirmada.</p>
+                <p className="text-muted-foreground">Sua inscrição foi confirmada com sucesso.</p>
                 <Button asChild className="w-full bg-primary hover:bg-primary/90 text-white font-bold h-12">
                   <a href={`/ingressos/${orderComplete}`}>VER MEU INGRESSO</a>
                 </Button>
@@ -234,12 +230,22 @@ export default function CheckoutPage() {
            <h1 className="text-3xl font-black font-headline tracking-tight">Checkout Seguro</h1>
         </div>
 
+        {errorMessage && (
+          <Alert variant="destructive" className="mb-8 bg-destructive/10 text-destructive border-destructive/20">
+            <AlertTriangle className="h-5 w-5" />
+            <AlertTitle className="font-bold">Atenção</AlertTitle>
+            <AlertDescription className="text-sm font-medium">
+              {errorMessage}
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
             <Card className="border-none shadow-sm">
               <CardHeader>
                 <CardTitle className="font-headline text-xl">Seus Dados</CardTitle>
-                <CardDescription>Estes dados serão usados para gerar o seu ingresso e certificado.</CardDescription>
+                <CardDescription>Preencha os dados do participante.</CardDescription>
               </CardHeader>
               <CardContent>
                 <form id="checkout-form" onSubmit={handleFinish} className="space-y-4">
@@ -257,37 +263,24 @@ export default function CheckoutPage() {
                       <Input name="email" type="email" value={formData.email} onChange={handleChange} placeholder="seu@email.com" required className="h-12" />
                     </div>
                   </div>
-                  <div className="space-y-2 pt-4 border-t">
-                    <Label className="font-bold">Endereço Residencial</Label>
-                    <Input name="address" value={formData.address} onChange={handleChange} placeholder="Rua, Número, Bairro" required className="h-12" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="font-bold">Cidade</Label>
-                      <Input name="city" value={formData.city} onChange={handleChange} required className="h-12" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="font-bold">CEP</Label>
-                      <Input name="zip" value={formData.zip} onChange={handleChange} placeholder="00000-000" required className="h-12" />
-                    </div>
-                  </div>
                 </form>
               </CardContent>
             </Card>
 
-            <div className="flex items-center gap-2 text-muted-foreground text-xs px-2">
-              <ShieldCheck className="h-4 w-4 text-green-500" />
-              Ambiente de teste ativo. Nenhuma cobrança real será feita no cartão ou banco.
-            </div>
+            <Alert className="bg-blue-50 border-blue-200">
+              <Info className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-xs text-blue-700">
+                Se estiver em modo de teste, use um CPF válido gerado e um e-mail diferente do seu cadastro no Mercado Pago.
+              </AlertDescription>
+            </Alert>
           </div>
 
           <div className="space-y-6">
             <Card className="border-none shadow-xl sticky top-24 overflow-hidden">
               <CardHeader className="bg-primary text-white">
-                <CardTitle className="font-headline">Resumo do Pedido</CardTitle>
+                <CardTitle className="font-headline">Resumo</CardTitle>
               </CardHeader>
-              <CardContent className="p-0">
-                <div className="p-6 space-y-4">
+              <CardContent className="p-6 space-y-4">
                    {items.map((item, idx) => (
                      <div key={idx} className="flex justify-between text-sm">
                         <span className="font-medium">{item.qty}x {item.name}</span>
@@ -298,11 +291,10 @@ export default function CheckoutPage() {
                       <span>Total</span>
                       <span>R$ {(total / 100).toFixed(2).replace('.', ',')}</span>
                    </div>
-                </div>
               </CardContent>
               <CardFooter className="p-6 pt-0">
                  <Button form="checkout-form" type="submit" disabled={isSubmitting} className="w-full bg-secondary hover:bg-secondary/90 text-white font-black h-16 text-xl rounded-2xl shadow-lg shadow-secondary/20 transition-all active:scale-95">
-                   {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : 'CONFIRMAR E PAGAR'}
+                   {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : 'FINALIZAR E PAGAR'}
                  </Button>
               </CardFooter>
             </Card>
