@@ -110,7 +110,6 @@ export default function NewEventPage() {
     }
   }, [watchedTitle, form, step, createdEventId]);
 
-  // Limpeza de Blob URL para evitar memory leak
   useEffect(() => {
     if (!imageFile) {
       setImagePreview(null);
@@ -144,7 +143,6 @@ export default function NewEventPage() {
       return;
     }
     
-    console.log('--- INICIANDO SALVAMENTO ---');
     if (isDraft) setIsSavingDraft(true);
     else setIsLoading(true);
 
@@ -155,10 +153,7 @@ export default function NewEventPage() {
         const ok = await form.trigger();
         if (!ok) {
           toast({ variant: 'destructive', title: 'Campos inválidos', description: 'Por favor, revise o formulário.' });
-          return;
-        }
-        if (!imageFile && !oldCoverPath) {
-          toast({ variant: 'destructive', title: 'Imagem obrigatória', description: 'Adicione uma capa para o evento.' });
+          setIsLoading(false);
           return;
         }
       }
@@ -189,53 +184,46 @@ export default function NewEventPage() {
 
       let eventId = createdEventId;
       if (!eventId) {
-        console.log('Criando novo documento no Firestore...');
         const docRef = await addDoc(collection(db, EVENTS_COLLECTION), {
           ...eventData,
           createdAt: serverTimestamp(),
         });
         eventId = docRef.id;
         setCreatedEventId(eventId);
-        console.log('Documento criado ID:', eventId);
       } else {
-        console.log('Atualizando documento existente:', eventId);
         await updateDoc(doc(db, EVENTS_COLLECTION, eventId), eventData as any);
       }
 
-      // TRATAMENTO DA IMAGEM
+      // TRATAMENTO DA IMAGEM COM TRATAMENTO DE ERRO CORS
       if (imageFile) {
-        console.log('Iniciando upload da imagem:', imageFile.name);
-        if (oldCoverPath) {
-          try { 
-            console.log('Deletando capa antiga:', oldCoverPath);
-            await deleteObject(ref(storage, oldCoverPath)); 
-          } catch (e) {
-            console.warn('Erro ao deletar capa antiga (provavelmente não existia):', e);
+        try {
+          if (oldCoverPath) {
+            try { await deleteObject(ref(storage, oldCoverPath)); } catch (e) {}
           }
+        
+          const safeName = imageFile.name.replace(/[^a-zA-Z0-9._-]/g, '-').toLowerCase();
+          const coverPath = `eventos/${eventId}/capa/cover-${Date.now()}-${safeName}`;
+          const imageRef = ref(storage, coverPath);
+        
+          const snap = await uploadBytes(imageRef, imageFile, {
+            contentType: imageFile.type
+          });
+          const coverUrl = await getDownloadURL(snap.ref);
+        
+          await updateDoc(doc(db, EVENTS_COLLECTION, eventId), { 
+            coverUrl, 
+            coverPath,
+            updatedAt: serverTimestamp()
+          });
+          setOldCoverPath(coverPath);
+        } catch (uploadError: any) {
+          console.error('ERRO NO UPLOAD (Pode ser CORS):', uploadError);
+          toast({ 
+            variant: 'destructive', 
+            title: 'Erro no Upload da Imagem', 
+            description: 'A imagem não foi salva devido a um erro de CORS ou permissão. O rascunho do evento foi salvo sem a imagem.' 
+          });
         }
-      
-        const safeName = imageFile.name.replace(/[^a-zA-Z0-9._-]/g, '-').toLowerCase();
-        const coverPath = `eventos/${eventId}/capa/cover-${Date.now()}-${safeName}`;
-        const imageRef = ref(storage, coverPath);
-      
-        console.log('Enviando para o Storage em:', coverPath);
-        const snap = await uploadBytes(imageRef, imageFile, {
-          contentType: imageFile.type
-        });
-        console.log('Upload concluído. Gerando URL...');
-        const coverUrl = await getDownloadURL(snap.ref);
-        console.log('URL gerada:', coverUrl);
-      
-        console.log('Atualizando Firestore com os links da imagem...');
-        await updateDoc(doc(db, EVENTS_COLLECTION, eventId), { 
-          coverUrl, 
-          coverPath,
-          updatedAt: serverTimestamp()
-        });
-        console.log('Firestore atualizado com sucesso!');
-        setOldCoverPath(coverPath);
-      } else {
-        console.log('Nenhuma imagem nova para subir.');
       }
 
       await setDoc(doc(db, EVENTS_COLLECTION, eventId, 'certificateConfig', 'main'), {
@@ -253,8 +241,8 @@ export default function NewEventPage() {
         router.push(`/admin/eventos/${eventId}`);
       }
     } catch (error: any) {
-      console.error('ERRO CRÍTICO NO SALVAMENTO:', error);
-      toast({ variant: 'destructive', title: 'Erro ao salvar', description: error.message || 'Verifique o console para detalhes.' });
+      console.error('ERRO GERAL NO SALVAMENTO:', error);
+      toast({ variant: 'destructive', title: 'Erro ao salvar', description: error.message || 'Erro desconhecido.' });
     } finally {
       setIsLoading(false);
       setIsSavingDraft(false);
