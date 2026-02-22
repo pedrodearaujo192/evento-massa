@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Navbar } from '@/components/navbar';
 import { Button } from '@/components/ui/button';
@@ -80,6 +80,7 @@ export default function CheckoutPage() {
 
     setIsSubmitting(true);
     try {
+      // 1. Criar o pedido
       const orderRef = await addDoc(collection(db, 'pedidos'), {
         eventId,
         userId: user?.uid || 'guest',
@@ -90,18 +91,27 @@ export default function CheckoutPage() {
         createdAt: serverTimestamp()
       });
 
+      // 2. Incrementar o contador de vendidos em cada ticketType
+      for (const item of items) {
+        const ticketRef = doc(db, 'eventos', eventId as string, 'ticketTypes', item.id);
+        await updateDoc(ticketRef, {
+          soldCount: increment(item.qty)
+        });
+      }
+
       setOrderComplete(orderRef.id);
       localStorage.removeItem('checkout_items');
       localStorage.removeItem('checkout_total');
       toast({ title: 'Pedido criado!', description: 'Siga as instruções para pagamento.' });
-    } catch (e) {
+    } catch (e: any) {
+      console.error(e);
       toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível processar seu pedido.' });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin" /></div>;
+  if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
 
   if (orderComplete) {
     return (
