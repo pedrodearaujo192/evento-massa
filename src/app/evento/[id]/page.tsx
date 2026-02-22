@@ -7,8 +7,8 @@ import { db } from '@/lib/firebase';
 import { Navbar } from '@/components/navbar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Calendar, MapPin, Ticket, Info, ChevronRight, Minus, Plus } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Loader2, Calendar, MapPin, Ticket, Info, Minus, Plus } from 'lucide-react';
 import Image from 'next/image';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -63,8 +63,7 @@ export default function EventPublicPage() {
       return;
     }
     
-    // Passar dados via localStorage ou state management simplificado
-    const selected = tickets.filter(t => quantities[t.id] > 0).map(t => ({
+    const selected = tickets.filter(t => (quantities[t.id] || 0) > 0).map(t => ({
       id: t.id,
       name: t.name,
       qty: quantities[t.id],
@@ -136,7 +135,7 @@ export default function EventPublicPage() {
                           </p>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground">Qtd disponível</span>
+                          <span className="text-xs text-muted-foreground">Qtd desejada</span>
                           <div className="flex items-center gap-3 bg-muted rounded-lg p-1">
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => updateQty(ticket.id, -1)}><Minus className="h-4 w-4" /></Button>
                             <span className="font-bold min-w-[20px] text-center">{quantities[ticket.id] || 0}</span>

@@ -6,9 +6,10 @@ import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/fires
 import { db } from '@/lib/firebase';
 import { Navbar } from '@/components/navbar';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, ArrowLeft, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
@@ -25,10 +26,9 @@ export default function CheckoutPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderComplete, setOrderComplete] = useState<string | null>(null);
 
-  // Form State
   const [formData, setFormData] = useState({
     fullName: '',
-    document: '', // CPF/CNPJ
+    document: '',
     email: '',
     address: '',
     city: '',
@@ -116,7 +116,7 @@ export default function CheckoutPage() {
            </div>
            <div className="bg-muted/50 p-6 rounded-xl border-2 border-dashed border-primary/20">
               <p className="text-sm font-bold mb-2">Instruções de Pagamento (PIX)</p>
-              <div className="bg-white p-4 rounded-lg mb-4 text-xs break-all">
+              <div className="bg-white p-4 rounded-lg mb-4 text-xs break-all font-mono">
                 00020126580014br.gov.bcb.pix0136suachavepixaqui5204000053039865405{(total/100).toFixed(2)}5802BR5913EVENTOMASSABR6009SAOPAULO62070503***6304****
               </div>
               <p className="text-[10px] text-muted-foreground">Após o pagamento, sua presença será confirmada pelo organizador.</p>
@@ -144,7 +144,7 @@ export default function CheckoutPage() {
                 <CardDescription>Informe os dados para a emissão do ingresso e certificado.</CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleFinish} className="space-y-4">
+                <form id="checkout-form" onSubmit={handleFinish} className="space-y-4">
                   <div className="space-y-2">
                     <Label>Nome Completo</Label>
                     <Input name="fullName" value={formData.fullName} onChange={handleChange} placeholder="Como deve aparecer no certificado" required />
@@ -204,7 +204,7 @@ export default function CheckoutPage() {
                 </div>
               </CardContent>
               <CardFooter className="p-4 pt-0">
-                 <Button onClick={handleFinish} disabled={isSubmitting} className="w-full bg-primary hover:bg-primary/90 text-white font-black h-14 text-lg rounded-xl">
+                 <Button form="checkout-form" type="submit" disabled={isSubmitting} className="w-full bg-primary hover:bg-primary/90 text-white font-black h-14 text-lg rounded-xl">
                    {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : 'CONCLUIR PEDIDO'}
                  </Button>
               </CardFooter>
@@ -215,5 +215,3 @@ export default function CheckoutPage() {
     </div>
   );
 }
-
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
