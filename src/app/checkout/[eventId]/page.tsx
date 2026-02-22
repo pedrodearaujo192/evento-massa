@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { doc, getDoc, collection, addDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, serverTimestamp, updateDoc, increment, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Navbar } from '@/components/navbar';
 import { Button } from '@/components/ui/button';
@@ -80,8 +81,11 @@ export default function CheckoutPage() {
 
     setIsSubmitting(true);
     try {
+      const batch = writeBatch(db);
+
       // 1. Criar o pedido
-      const orderRef = await addDoc(collection(db, 'pedidos'), {
+      const orderRef = doc(collection(db, 'pedidos'));
+      batch.set(orderRef, {
         eventId,
         userId: user?.uid || 'guest',
         customer: formData,
@@ -91,13 +95,31 @@ export default function CheckoutPage() {
         createdAt: serverTimestamp()
       });
 
-      // 2. Incrementar o contador de vendidos em cada ticketType
+      // 2. Gerar Ingressos individuais e atualizar contadores
       for (const item of items) {
-        const ticketRef = doc(db, 'eventos', eventId as string, 'ticketTypes', item.id);
-        await updateDoc(ticketRef, {
+        // Gerar um ingresso para cada unidade comprada
+        for (let i = 0; i < item.qty; i++) {
+          const ticketRef = doc(collection(db, 'ingressos'));
+          batch.set(ticketRef, {
+            orderId: orderRef.id,
+            eventId,
+            userName: formData.fullName,
+            userEmail: formData.email,
+            ticketName: item.name,
+            status: 'ativo',
+            checkedInAt: null,
+            createdAt: serverTimestamp()
+          });
+        }
+
+        // Atualizar contador no tipo de ingresso
+        const typeRef = doc(db, 'eventos', eventId as string, 'ticketTypes', item.id);
+        batch.update(typeRef, {
           soldCount: increment(item.qty)
         });
       }
+
+      await batch.commit();
 
       setOrderComplete(orderRef.id);
       localStorage.removeItem('checkout_items');
@@ -116,20 +138,22 @@ export default function CheckoutPage() {
   if (orderComplete) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-muted/20 p-4">
-        <Card className="max-w-md w-full text-center p-8 space-y-6">
+        <Card className="max-w-md w-full text-center p-8 space-y-6 shadow-2xl">
            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
               <CheckCircle2 className="h-10 w-10 text-green-600" />
            </div>
            <div className="space-y-2">
               <h1 className="text-2xl font-black font-headline">Pedido Realizado!</h1>
-              <p className="text-muted-foreground">Número do pedido: <span className="font-mono text-primary">{orderComplete}</span></p>
+              <p className="text-muted-foreground">Número do pedido: <span className="font-mono text-primary font-bold">{orderComplete}</span></p>
            </div>
-           <div className="bg-muted/50 p-6 rounded-xl border-2 border-dashed border-primary/20">
+           <div className="bg-muted/50 p-6 rounded-xl border-2 border-dashed border-primary/20 space-y-4">
               <p className="text-sm font-bold mb-2">Instruções de Pagamento (PIX)</p>
-              <div className="bg-white p-4 rounded-lg mb-4 text-xs break-all font-mono">
+              <div className="bg-white p-4 rounded-lg text-[10px] break-all font-mono border">
                 00020126580014br.gov.bcb.pix0136suachavepixaqui5204000053039865405{(total/100).toFixed(2)}5802BR5913EVENTOMASSABR6009SAOPAULO62070503***6304****
               </div>
-              <p className="text-[10px] text-muted-foreground">Após o pagamento, sua presença será confirmada pelo organizador.</p>
+              <Button asChild variant="outline" className="w-full">
+                <a href={`/ingressos/${orderComplete}`}>VER MEUS INGRESSOS</a>
+              </Button>
            </div>
            <Button className="w-full" onClick={() => router.push('/')}>Voltar para o Início</Button>
         </Card>
