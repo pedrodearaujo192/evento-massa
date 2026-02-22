@@ -6,10 +6,10 @@ import { useParams, useRouter } from 'next/navigation';
 import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Navbar } from '@/components/navbar';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Download, MapPin, Calendar, Ticket, User, ArrowLeft, QrCode as QrCodeIcon } from 'lucide-react';
+import { Loader2, MapPin, Calendar, Ticket, User, ArrowLeft, QrCode as QrCodeIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Image from 'next/image';
@@ -36,7 +36,7 @@ export default function OrderTicketsPage() {
         setOrder(orderData);
 
         const eventSnap = await getDoc(doc(db, 'eventos', orderData.eventId));
-        if (eventSnap.exists()) setEvent(eventSnap.data());
+        if (eventSnap.exists()) setEvent({ id: eventSnap.id, ...eventSnap.data() });
 
         const ticketsQuery = query(collection(db, 'ingressos'), where('orderId', '==', orderId));
         const ticketsSnap = await getDocs(ticketsQuery);
@@ -51,122 +51,124 @@ export default function OrderTicketsPage() {
     fetchData();
   }, [orderId, router]);
 
-  if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
+  if (loading) return <div className="flex h-screen items-center justify-center bg-background"><Loader2 className="animate-spin text-primary h-12 w-12" /></div>;
 
   return (
-    <div className="min-h-screen bg-muted/20 pb-20">
+    <div className="min-h-screen bg-muted/30 pb-20">
       <Navbar />
       <main className="container mx-auto px-4 py-8">
-        <div className="flex items-center gap-4 mb-8">
-           <Button variant="outline" size="icon" onClick={() => router.push('/')}><ArrowLeft className="h-4 w-4" /></Button>
-           <div>
-              <h1 className="text-3xl font-black font-headline">Meus Ingressos</h1>
-              <p className="text-muted-foreground text-sm uppercase tracking-wider font-bold">PEDIDO: {orderId}</p>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+           <div className="flex items-center gap-4">
+              <Button variant="outline" size="icon" className="rounded-full shadow-sm" onClick={() => router.push('/')}><ArrowLeft className="h-4 w-4" /></Button>
+              <div>
+                 <h1 className="text-3xl font-black font-headline tracking-tight text-foreground">Meus Ingressos</h1>
+                 <p className="text-muted-foreground text-xs uppercase tracking-widest font-bold">PEDIDO: {orderId}</p>
+              </div>
            </div>
+           <Badge variant="outline" className="border-primary/20 text-primary font-bold px-4 py-1 h-fit">
+             {tickets.length} {tickets.length === 1 ? 'INGRESSO' : 'INGRESSOS'}
+           </Badge>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-           <div className="lg:col-span-1">
-              <Card className="border-none shadow-sm overflow-hidden sticky top-24">
-                 <div className="relative aspect-video">
-                    <Image src={event?.coverUrl || "https://picsum.photos/seed/event/600/400"} alt="Evento" fill className="object-cover" />
-                 </div>
-                 <CardContent className="p-4 space-y-4">
-                    <h2 className="font-black text-xl font-headline leading-tight">{event?.title}</h2>
-                    <div className="space-y-2 text-sm text-muted-foreground">
-                       <div className="flex items-center gap-2"><Calendar className="h-4 w-4 text-primary" /> {event?.startAt ? format(event.startAt.toDate(), "dd 'de' MMMM", { locale: ptBR }) : ''}</div>
-                       <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" /> {event?.city}, {event?.state}</div>
+        <div className="flex flex-wrap gap-10 justify-center">
+          {tickets.map((ticket, idx) => (
+            <Card key={ticket.id} className="w-full max-w-[380px] border-none shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col bg-white rounded-3xl group">
+               {/* Ticket Header: Imagem do Evento */}
+               <div className="relative h-48 w-full">
+                  <Image 
+                    src={event?.coverUrl || "https://picsum.photos/seed/event/600/400"} 
+                    alt="Capa do Evento" 
+                    fill 
+                    className="object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-6">
+                    <Badge className="bg-primary text-white w-fit mb-2 shadow-lg">{ticket.ticketName}</Badge>
+                    <h2 className="text-white font-black text-2xl font-headline leading-tight line-clamp-2">{event?.title}</h2>
+                  </div>
+               </div>
+               
+               {/* Ticket Body: Info Principal */}
+               <div className="p-8 space-y-8 relative">
+                  {/* Detalhes do Evento */}
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">DATA DO EVENTO</p>
+                      <p className="font-bold flex items-center gap-2 text-sm">
+                        <Calendar className="h-4 w-4 text-primary" />
+                        {event?.startAt ? format(event.startAt.toDate(), "dd/MM/yyyy", { locale: ptBR }) : '--/--/--'}
+                      </p>
                     </div>
-                 </CardContent>
-              </Card>
-           </div>
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">HORÁRIO</p>
+                      <p className="font-bold text-sm">
+                        {event?.startAt ? format(event.startAt.toDate(), "HH:mm'h'", { locale: ptBR }) : '--:--'}
+                      </p>
+                    </div>
+                  </div>
 
-           <div className="lg:col-span-3 flex flex-wrap gap-6 justify-center md:justify-start">
-              {tickets.map((ticket, idx) => (
-                <Card key={ticket.id} className="w-full max-w-[350px] border-none shadow-2xl overflow-hidden flex flex-col bg-white">
-                   {/* Top stub decoration */}
-                   <div className="h-3 bg-primary w-full" />
-                   
-                   <div className="p-6 md:p-8 flex-1 space-y-6 relative border-b border-dashed border-muted-foreground/30">
-                      {/* Side stub notches */}
-                      <div className="absolute bottom-0 left-0 -translate-x-1/2 translate-y-1/2 w-6 h-6 bg-muted/20 rounded-full" />
-                      <div className="absolute bottom-0 right-0 translate-x-1/2 translate-y-1/2 w-6 h-6 bg-muted/20 rounded-full" />
-                      
-                      <div className="flex justify-between items-start">
-                         <div>
-                            <Badge className="bg-secondary text-white mb-2">{ticket.ticketName}</Badge>
-                            <h3 className="text-xl font-black font-headline leading-tight">{event?.title}</h3>
-                         </div>
-                         <div className="text-right">
-                            <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest">VOUCHER</p>
-                            <p className="font-mono text-xs font-bold">#{idx + 1}/{tickets.length}</p>
-                         </div>
-                      </div>
+                  <div className="space-y-1">
+                    <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">TITULAR DO INGRESSO</p>
+                    <p className="font-bold flex items-center gap-2 text-base text-foreground">
+                      <User className="h-5 w-5 text-primary" />
+                      {ticket.userName}
+                    </p>
+                  </div>
 
-                      <div className="space-y-4">
-                         <div className="space-y-1">
-                            <p className="text-[10px] text-muted-foreground font-bold uppercase">TITULAR DO WORKSHOP</p>
-                            <p className="font-bold flex items-center gap-2 text-sm"><User className="h-4 w-4 text-primary" /> {ticket.userName}</p>
-                         </div>
+                  <div className="space-y-1">
+                    <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">LOCALIZAÇÃO</p>
+                    <p className="text-sm font-medium flex items-start gap-2 leading-tight">
+                      <MapPin className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                      <span>{event?.address}, {event?.city} - {event?.state}</span>
+                    </p>
+                  </div>
 
-                         <div className="grid grid-cols-2 gap-2">
-                           <div className="space-y-1">
-                              <p className="text-[10px] text-muted-foreground font-bold uppercase">DATA</p>
-                              <p className="text-xs font-bold">{event?.startAt ? format(event.startAt.toDate(), "dd/MM/yyyy") : '--'}</p>
-                           </div>
-                           <div className="space-y-1">
-                              <p className="text-[10px] text-muted-foreground font-bold uppercase">STATUS</p>
-                              <Badge variant={ticket.status === 'ativo' ? 'outline' : 'default'} className={`text-[9px] h-5 ${ticket.status === 'ativo' ? 'border-green-500 text-green-600' : 'bg-green-500'}`}>
-                                 {ticket.status === 'ativo' ? 'VÁLIDO' : 'USADO'}
-                              </Badge>
-                           </div>
-                         </div>
-                      </div>
+                  {/* Divisória Serrilhada (Notches) */}
+                  <div className="absolute -bottom-[1px] left-0 w-full flex items-center justify-between px-[-12px]">
+                    <div className="w-6 h-6 bg-muted/30 rounded-full -ml-3 shadow-inner" />
+                    <div className="flex-1 border-t-2 border-dashed border-muted-foreground/20 mx-1" />
+                    <div className="w-6 h-6 bg-muted/30 rounded-full -mr-3 shadow-inner" />
+                  </div>
+               </div>
 
-                      <div className="pt-4 border-t border-muted/30 flex flex-col gap-2 text-[10px] text-muted-foreground">
-                         <div className="flex items-center gap-2 font-medium">
-                           <MapPin className="h-3 w-3 text-primary" /> 
-                           <span className="truncate">{event?.address}</span>
-                         </div>
-                         <div className="flex items-center gap-2 font-medium">
-                           <Ticket className="h-3 w-3" /> 
-                           <span>Apresente para entrada</span>
-                         </div>
-                      </div>
-                   </div>
+               {/* Ticket Stub: QR Code e Validação */}
+               <div className="p-8 bg-muted/5 flex flex-col items-center justify-center space-y-6">
+                  <div className="bg-white p-4 rounded-2xl shadow-xl border border-primary/5 transition-transform hover:scale-105 duration-300">
+                     <Image 
+                       src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${ticket.id}`} 
+                       alt="QR Code Validação" 
+                       width={180}
+                       height={180}
+                       className="object-contain"
+                       priority
+                     />
+                  </div>
+                  
+                  <div className="text-center space-y-3">
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">CÓDIGO DE VALIDAÇÃO</p>
+                      <p className="font-mono text-[11px] font-bold text-foreground bg-muted/50 px-3 py-1 rounded-md border border-muted/50">{ticket.id}</p>
+                    </div>
+                    
+                    <Button variant="secondary" size="sm" className="font-bold text-[11px] h-9 px-6 rounded-full shadow-lg shadow-secondary/20" asChild>
+                       <a href={`https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${ticket.id}`} download target="_blank">
+                         BAIXAR QR CODE
+                       </a>
+                    </Button>
+                  </div>
+               </div>
+               
+               {/* Decoração Final */}
+               <div className="h-4 bg-primary/10 w-full" />
+            </Card>
+          ))}
 
-                   <div className="p-6 md:p-8 flex flex-col items-center justify-center gap-4 bg-muted/5">
-                      <div className="bg-white p-3 rounded-xl shadow-inner border border-primary/5">
-                         <Image 
-                           src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${ticket.id}`} 
-                           alt="QR Code Validação" 
-                           width={160}
-                           height={160}
-                           className="object-contain"
-                         />
-                      </div>
-                      <div className="text-center space-y-1">
-                        <p className="text-[9px] font-mono text-muted-foreground uppercase tracking-tighter">ID DE VALIDAÇÃO: {ticket.id}</p>
-                        <Button variant="link" size="sm" className="text-[10px] h-auto p-0 text-primary font-bold" asChild>
-                           <a href={`https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${ticket.id}`} download target="_blank">
-                             BAIXAR QR CODE
-                           </a>
-                        </Button>
-                      </div>
-                   </div>
-                   
-                   {/* Bottom stub decoration */}
-                   <div className="h-2 bg-primary/20 w-full" />
-                </Card>
-              ))}
-
-              {tickets.length === 0 && (
-                <div className="text-center py-20 bg-white rounded-xl border-2 border-dashed w-full">
-                  <QrCodeIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-20" />
-                  <p className="text-muted-foreground">Seus ingressos estão sendo gerados...</p>
-                </div>
-              )}
-           </div>
+          {tickets.length === 0 && (
+            <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-muted/50 w-full max-w-xl">
+              <QrCodeIcon className="h-16 w-16 mx-auto text-muted-foreground mb-4 opacity-10" />
+              <p className="text-muted-foreground font-bold">Nenhum ingresso encontrado para este pedido.</p>
+              <Button variant="link" onClick={() => router.push('/')}>Voltar para o início</Button>
+            </div>
+          )}
         </div>
       </main>
     </div>
