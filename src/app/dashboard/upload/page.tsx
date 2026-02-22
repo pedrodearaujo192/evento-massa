@@ -83,7 +83,9 @@ export default function UploadPage() {
       log('Enviando para o Firebase Storage...');
 
       // O uploadBytes retorna uma promessa. O await garante que esperamos a conclusão.
-      const snapshot = await uploadBytes(imageStorageRef, imageFile);
+      const snapshot = await uploadBytes(imageStorageRef, imageFile, {
+        contentType: imageFile.type
+      });
       log('✅ uploadBytes concluído!');
       
       const imageUrl = await getDownloadURL(snapshot.ref);

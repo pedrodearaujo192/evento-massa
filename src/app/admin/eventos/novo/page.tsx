@@ -124,8 +124,8 @@ export default function NewEventPage() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        toast({ variant: 'destructive', title: 'Arquivo muito grande', description: 'O tamanho máximo permitido é 2MB.' });
+      if (file.size > 5 * 1024 * 1024) {
+        toast({ variant: 'destructive', title: 'Arquivo muito grande', description: 'O tamanho máximo permitido é 5MB.' });
         return;
       }
       setImageFile(file);
@@ -139,8 +139,12 @@ export default function NewEventPage() {
   };
 
   const handleSave = async (isDraft: boolean) => {
-    if (!user) return;
+    if (!user) {
+      toast({ variant: 'destructive', title: 'Não autenticado', description: 'Você precisa estar logado.' });
+      return;
+    }
     
+    console.log('--- INICIANDO SALVAMENTO ---');
     if (isDraft) setIsSavingDraft(true);
     else setIsLoading(true);
 
@@ -185,33 +189,53 @@ export default function NewEventPage() {
 
       let eventId = createdEventId;
       if (!eventId) {
+        console.log('Criando novo documento no Firestore...');
         const docRef = await addDoc(collection(db, EVENTS_COLLECTION), {
           ...eventData,
           createdAt: serverTimestamp(),
         });
         eventId = docRef.id;
         setCreatedEventId(eventId);
+        console.log('Documento criado ID:', eventId);
       } else {
+        console.log('Atualizando documento existente:', eventId);
         await updateDoc(doc(db, EVENTS_COLLECTION, eventId), eventData as any);
       }
 
+      // TRATAMENTO DA IMAGEM
       if (imageFile) {
+        console.log('Iniciando upload da imagem:', imageFile.name);
         if (oldCoverPath) {
-          try { await deleteObject(ref(storage, oldCoverPath)); } catch {}
+          try { 
+            console.log('Deletando capa antiga:', oldCoverPath);
+            await deleteObject(ref(storage, oldCoverPath)); 
+          } catch (e) {
+            console.warn('Erro ao deletar capa antiga (provavelmente não existia):', e);
+          }
         }
       
         const safeName = imageFile.name.replace(/[^a-zA-Z0-9._-]/g, '-').toLowerCase();
         const coverPath = `eventos/${eventId}/capa/cover-${Date.now()}-${safeName}`;
         const imageRef = ref(storage, coverPath);
       
-        const snap = await uploadBytes(imageRef, imageFile);
+        console.log('Enviando para o Storage em:', coverPath);
+        const snap = await uploadBytes(imageRef, imageFile, {
+          contentType: imageFile.type
+        });
+        console.log('Upload concluído. Gerando URL...');
         const coverUrl = await getDownloadURL(snap.ref);
+        console.log('URL gerada:', coverUrl);
       
+        console.log('Atualizando Firestore com os links da imagem...');
         await updateDoc(doc(db, EVENTS_COLLECTION, eventId), { 
           coverUrl, 
-          coverPath 
+          coverPath,
+          updatedAt: serverTimestamp()
         });
+        console.log('Firestore atualizado com sucesso!');
         setOldCoverPath(coverPath);
+      } else {
+        console.log('Nenhuma imagem nova para subir.');
       }
 
       await setDoc(doc(db, EVENTS_COLLECTION, eventId, 'certificateConfig', 'main'), {
@@ -229,8 +253,8 @@ export default function NewEventPage() {
         router.push(`/admin/eventos/${eventId}`);
       }
     } catch (error: any) {
-      console.error(error);
-      toast({ variant: 'destructive', title: 'Erro ao salvar', description: error.message });
+      console.error('ERRO CRÍTICO NO SALVAMENTO:', error);
+      toast({ variant: 'destructive', title: 'Erro ao salvar', description: error.message || 'Verifique o console para detalhes.' });
     } finally {
       setIsLoading(false);
       setIsSavingDraft(false);
@@ -346,7 +370,7 @@ export default function NewEventPage() {
                         <label className="w-full h-full flex flex-col items-center justify-center cursor-pointer p-10">
                           <div className="bg-primary/10 p-5 rounded-full mb-4 group-hover:scale-110 transition-transform"><Upload className="h-8 w-8 text-primary" /></div>
                           <span className="text-lg font-black text-foreground">Clique para selecionar imagem</span>
-                          <span className="text-sm text-muted-foreground mt-2">JPG, PNG ou WEBP até 2MB</span>
+                          <span className="text-sm text-muted-foreground mt-2">JPG, PNG ou WEBP até 5MB</span>
                           <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
                         </label>
                       )}
