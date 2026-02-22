@@ -6,7 +6,7 @@ export async function POST(req: Request) {
   try {
     const token = (process.env.MERCADOPAGO_ACCESS_TOKEN || process.env.MERCADO_PAGO_ACCESS_TOKEN || '').trim();
 
-    if (!token || token === 'SEU_TOKEN_DE_TESTE_AQUI') {
+    if (!token) {
       return NextResponse.json(
         { error: 'Token do Mercado Pago não configurado no .env' },
         { status: 500 }
@@ -22,7 +22,11 @@ export async function POST(req: Request) {
     
     const preference = new Preference(client);
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:9002';
+    // DETECÇÃO DINÂMICA: Isso evita que o back_urls.success fique vazio no ambiente do Studio
+    const origin = new URL(req.url).origin;
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || origin;
+
+    console.log(`Gerando preferência para o pedido ${orderId} com siteUrl: ${siteUrl}`);
 
     const body = {
       external_reference: String(orderId),
