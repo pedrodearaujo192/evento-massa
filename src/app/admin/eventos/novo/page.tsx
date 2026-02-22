@@ -49,7 +49,8 @@ import {
   Image as ImageIcon,
   MapPin,
   FileText,
-  ArrowRight
+  ArrowRight,
+  PlusCircle
 } from 'lucide-react';
 import Image from 'next/image';
 
@@ -109,6 +110,17 @@ export default function NewEventPage() {
     }
   }, [watchedTitle, form, step, createdEventId]);
 
+  // Limpeza de Blob URL para evitar memory leak
+  useEffect(() => {
+    if (!imageFile) {
+      setImagePreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(imageFile);
+    setImagePreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [imageFile]);
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -117,9 +129,6 @@ export default function NewEventPage() {
         return;
       }
       setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => setImagePreview(reader.result as string);
-      reader.readAsDataURL(file);
     }
   };
 
@@ -160,23 +169,16 @@ export default function NewEventPage() {
 
       const eventData = {
         ownerId: user.uid,
-        id_criador: user.uid, // Mantendo compatibilidade com código anterior
         title: data.title,
-        titulo: data.title, // Mantendo compatibilidade
         slug: finalSlug,
         category: data.category,
-        categoria: data.category, // Mantendo compatibilidade
         startAt: data.startAt ? Timestamp.fromDate(new Date(data.startAt)) : null,
         endAt: data.endAt ? Timestamp.fromDate(new Date(data.endAt)) : null,
-        data: data.startAt ? data.startAt.split('T')[0] : '', // Mantendo compatibilidade
         city: data.city,
-        cidade: data.city, // Mantendo compatibilidade
         state: data.state,
         address: data.address,
-        local: `${data.city} - ${data.state}`, // Mantendo compatibilidade
         capacity: data.capacity,
         description: data.description,
-        descricao: data.description, // Mantendo compatibilidade
         status: 'draft',
         updatedAt: serverTimestamp(),
       };
@@ -186,7 +188,6 @@ export default function NewEventPage() {
         const docRef = await addDoc(collection(db, EVENTS_COLLECTION), {
           ...eventData,
           createdAt: serverTimestamp(),
-          criadoEm: serverTimestamp(), // Mantendo compatibilidade
         });
         eventId = docRef.id;
         setCreatedEventId(eventId);
@@ -208,13 +209,11 @@ export default function NewEventPage() {
       
         await updateDoc(doc(db, EVENTS_COLLECTION, eventId), { 
           coverUrl, 
-          coverPath,
-          imagem_url: coverUrl // Mantendo compatibilidade
+          coverPath 
         });
         setOldCoverPath(coverPath);
       }
 
-      // Config do Certificado
       await setDoc(doc(db, EVENTS_COLLECTION, eventId, 'certificateConfig', 'main'), {
         enabled: data.certEnabled,
         attendanceMode: data.attendanceMode,
@@ -340,7 +339,7 @@ export default function NewEventPage() {
                         <div className="relative w-full h-full">
                           <Image src={imagePreview} alt="Preview" fill className="object-cover" />
                           <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                             <Button variant="destructive" size="lg" className="font-bold" onClick={() => { setImageFile(null); setImagePreview(null); }}>Trocar Imagem</Button>
+                             <Button variant="destructive" size="lg" className="font-bold" onClick={() => { setImageFile(null); }}>Trocar Imagem</Button>
                           </div>
                         </div>
                       ) : (
@@ -389,5 +388,3 @@ export default function NewEventPage() {
     </div>
   );
 }
-
-import { PlusCircle } from 'lucide-react';

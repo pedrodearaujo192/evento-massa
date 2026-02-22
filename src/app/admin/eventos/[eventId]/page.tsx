@@ -37,6 +37,16 @@ import {
   DialogTrigger,
   DialogFooter
 } from '@/components/ui/dialog';
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
 import { 
   Loader2, 
@@ -45,13 +55,19 @@ import {
   Users, 
   BarChart3, 
   Settings, 
-  Award, 
   Calendar, 
   MapPin, 
   ArrowLeft,
   Trash2,
-  Edit
+  Edit,
+  MoreHorizontal
 } from 'lucide-react';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -80,10 +96,14 @@ export default function ManageEventPage() {
   const [loading, setLoading] = useState(true);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isAddingTicket, setIsAddingTicket] = useState(false);
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
   // Modal State
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
   const [editingTicket, setEditingTicket] = useState<TicketType | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [ticketToDelete, setTicketToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (!eventId || !user) return;
@@ -118,6 +138,35 @@ export default function ManageEventPage() {
       toast({ title: 'Evento publicado!', description: 'O evento agora está visível para o público.' });
     } finally {
       setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleEditTicket = (ticket: TicketType) => {
+    setMenuOpenId(null);
+    setEditingTicket(ticket);
+    setIsTicketModalOpen(true);
+  };
+
+  const handleDeleteTicketClick = (id: string) => {
+    setMenuOpenId(null);
+    setTicketToDelete(id);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteTicket = async () => {
+    if (!ticketToDelete) return;
+    setIsDeleting(true);
+    try {
+      await deleteDoc(doc(db, 'eventos', eventId as string, 'ticketTypes', ticketToDelete));
+      toast({ title: 'Excluído', description: 'Ingresso removido.' });
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Erro', description: 'Erro ao excluir.' });
+    } finally {
+      setIsDeleting(false);
+      setTimeout(() => {
+        setIsDeleteDialogOpen(false);
+        setTicketToDelete(null);
+      }, 0);
     }
   };
 
@@ -158,16 +207,6 @@ export default function ManageEventPage() {
     }
   };
 
-  const deleteTicket = async (id: string) => {
-    if (!confirm('Deseja excluir este ingresso?')) return;
-    try {
-      await deleteDoc(doc(db, 'eventos', eventId as string, 'ticketTypes', id));
-      toast({ title: 'Excluído', description: 'Ingresso removido.' });
-    } catch (e) {
-      toast({ variant: 'destructive', title: 'Erro', description: 'Erro ao excluir.' });
-    }
-  };
-
   if (loading || !event) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin" /></div>;
 
   const totalTickets = ticketTypes.reduce((acc, t) => acc + t.quantity, 0);
@@ -186,7 +225,9 @@ export default function ManageEventPage() {
               </Badge>
               <span className="text-xs text-muted-foreground uppercase tracking-wider">{event.category}</span>
             </div>
-            <h1 className="text-3xl font-black font-headline">{event.title}</h1>
+            <h1 className="text-3xl font-black font-headline tracking-tight">
+               <span className="text-secondary">Gerenciar:</span> {event.title}
+            </h1>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -195,7 +236,6 @@ export default function ManageEventPage() {
               {isUpdatingStatus ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'PUBLICAR EVENTO'}
             </Button>
           )}
-          <Button variant="outline" onClick={() => router.push(`/evento/${event.id}`)}>Ver Página Pública</Button>
         </div>
       </div>
 
@@ -214,16 +254,14 @@ export default function ManageEventPage() {
             <Card className="border-none shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Capacidade Local</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{event.capacity}</div><p className="text-xs text-muted-foreground">pessoas no espaço</p></CardContent></Card>
             <Card className="border-none shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Status</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold capitalize">{event.status === 'published' ? 'Ativo' : 'Pausado'}</div></CardContent></Card>
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-             <Card className="lg:col-span-2 border-none shadow-sm">
-                <CardHeader><CardTitle>Informações do Evento</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
-                   <div className="flex items-center gap-3 text-sm"><Calendar className="h-4 w-4 text-primary" /> {event.startAt ? format(event.startAt.toDate(), "dd 'de' MMMM 'às' HH:mm", { locale: ptBR }) : 'Não definido'}</div>
-                   <div className="flex items-center gap-3 text-sm"><MapPin className="h-4 w-4 text-primary" /> {event.address}, {event.city} - {event.state}</div>
-                   <div className="pt-4"><p className="text-sm text-muted-foreground line-clamp-4">{event.description}</p></div>
-                </CardContent>
-             </Card>
-          </div>
+          <Card className="border-none shadow-sm">
+             <CardHeader><CardTitle>Informações do Evento</CardTitle></CardHeader>
+             <CardContent className="space-y-4">
+                <div className="flex items-center gap-3 text-sm"><Calendar className="h-4 w-4 text-primary" /> {event.startAt ? format(event.startAt.toDate(), "dd 'de' MMMM 'às' HH:mm", { locale: ptBR }) : 'Não definido'}</div>
+                <div className="flex items-center gap-3 text-sm"><MapPin className="h-4 w-4 text-primary" /> {event.address}, {event.city} - {event.state}</div>
+                <div className="pt-4"><p className="text-sm text-muted-foreground line-clamp-4">{event.description}</p></div>
+             </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="tickets" className="space-y-6">
@@ -231,12 +269,12 @@ export default function ManageEventPage() {
             <h2 className="text-xl font-bold">Tipos de Ingresso</h2>
             <Dialog open={isTicketModalOpen} onOpenChange={(open) => { setIsTicketModalOpen(open); if(!open) setEditingTicket(null); }}>
               <DialogTrigger asChild><Button className="bg-secondary text-white font-bold"><Plus className="mr-2 h-4 w-4" /> Adicionar Ingresso</Button></DialogTrigger>
-              <DialogContent className="max-w-md">
+              <DialogContent className="max-w-md" onOpenAutoFocus={(e) => e.preventDefault()} onCloseAutoFocus={(e) => e.preventDefault()}>
                 <DialogHeader><DialogTitle>{editingTicket ? 'Editar Ingresso' : 'Novo Tipo de Ingresso'}</DialogTitle></DialogHeader>
                 <form onSubmit={handleSaveTicket} className="space-y-4">
                   <div className="space-y-2">
                     <Label>Nome do Lote</Label>
-                    <Input name="name" defaultValue={editingTicket?.name} placeholder="Ex: Lote 1, VIP, Meia Entrada" required />
+                    <Input name="name" defaultValue={editingTicket?.name} placeholder="Ex: Pista, VIP" required />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -306,10 +344,24 @@ export default function ManageEventPage() {
                       <Badge variant={ticket.active ? 'default' : 'outline'}>{ticket.active ? 'Ativo' : 'Inativo'}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => { setEditingTicket(ticket); setIsTicketModalOpen(true); }}><Edit className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteTicket(ticket.id)}><Trash2 className="h-4 w-4" /></Button>
-                      </div>
+                      <DropdownMenu
+                        open={menuOpenId === ticket.id}
+                        onOpenChange={(open) => setMenuOpenId(open ? ticket.id : null)}
+                      >
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
+                          <DropdownMenuItem onClick={() => handleEditTicket(ticket)}>
+                            <Edit className="mr-2 h-4 w-4" /> Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteTicketClick(ticket.id)}>
+                            <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -319,6 +371,31 @@ export default function ManageEventPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Ingresso</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja remover este tipo de ingresso? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeleting}
+              onClick={(e) => {
+                e.preventDefault();
+                confirmDeleteTicket();
+              }}
+            >
+              {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
