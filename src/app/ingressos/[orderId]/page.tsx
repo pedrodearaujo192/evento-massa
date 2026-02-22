@@ -9,7 +9,7 @@ import { Navbar } from '@/components/navbar';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, MapPin, Calendar, User, ArrowLeft, Download, FileText } from 'lucide-react';
+import { Loader2, MapPin, Calendar, User, ArrowLeft, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Image from 'next/image';
@@ -63,40 +63,48 @@ export default function OrderTicketsPage() {
     if (!element) return;
 
     setDownloadingId(ticketId);
-    toast({ title: 'Gerando ingresso...', description: 'Aguarde um momento.' });
+    toast({ title: 'Gerando PDF...', description: 'Processando seu ingresso de alta qualidade.' });
 
     try {
-      // Captura o elemento como canvas
+      // Captura o elemento com configurações otimizadas para PDF
       const canvas = await html2canvas(element, {
-        scale: 2, // Aumenta a qualidade
-        useCORS: true, // Necessário para imagens de outros domínios (Firebase/Picsum)
+        scale: 3, // Aumenta drasticamente a qualidade para impressão
+        useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
+        windowWidth: element.scrollWidth,
+        windowHeight: element.scrollHeight,
       });
 
-      const imgData = canvas.toDataURL('image/png');
+      const imgData = canvas.toDataURL('image/png', 1.0);
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
         format: 'a4',
       });
 
-      // Calcula as dimensões para caber no A4 centralizado
-      const imgProps = pdf.getImageProperties(imgData);
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      const pdfHeight = pdf.internal.pageSize.getHeight();
       
-      const marginX = (pdfWidth - (pdfWidth * 0.8)) / 2;
-      const finalWidth = pdfWidth * 0.8;
-      const finalHeight = (imgProps.height * finalWidth) / imgProps.width;
+      // Calcula dimensões para o card ficar centralizado e grande no A4
+      const canvasWidth = canvas.width;
+      const canvasHeight = canvas.height;
+      const ratio = canvasHeight / canvasWidth;
+      
+      const imgWidth = pdfWidth * 0.85; // Ocupa 85% da largura da folha
+      const imgHeight = imgWidth * ratio;
+      
+      const marginX = (pdfWidth - imgWidth) / 2;
+      const marginY = (pdfHeight - imgHeight) / 2;
 
-      pdf.addImage(imgData, 'PNG', marginX, 10, finalWidth, finalHeight);
+      // Adiciona a imagem ao PDF (se for muito alto, pode precisar de ajuste, mas tickets verticais costumam caber)
+      pdf.addImage(imgData, 'PNG', marginX, Math.max(10, marginY), imgWidth, imgHeight);
       pdf.save(`ingresso-${ticketId}.pdf`);
 
-      toast({ title: 'Sucesso!', description: 'Seu ingresso foi baixado.' });
+      toast({ title: 'Pronto!', description: 'Seu ingresso foi baixado com sucesso.' });
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
-      toast({ variant: 'destructive', title: 'Erro ao baixar', description: 'Não foi possível gerar o PDF agora.' });
+      toast({ variant: 'destructive', title: 'Erro ao baixar', description: 'Ocorreu uma falha na geração do arquivo.' });
     } finally {
       setDownloadingId(null);
     }
@@ -123,101 +131,103 @@ export default function OrderTicketsPage() {
 
         <div className="flex flex-wrap gap-12 justify-center">
           {tickets.map((ticket) => (
-            <div key={ticket.id} className="flex flex-col gap-4 items-center max-w-[380px] w-full">
-              {/* O Card do Ingresso com Ref para captura */}
+            <div key={ticket.id} className="flex flex-col gap-6 items-center max-w-[400px] w-full">
+              {/* O Card do Ingresso Vertical Profissional */}
               <Card 
                 ref={(el) => { ticketRefs.current[ticket.id] = el; }}
-                className="w-full border-none shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col bg-white rounded-3xl group"
+                className="w-full border-none shadow-[0_30px_60px_rgba(0,0,0,0.2)] overflow-hidden flex flex-col bg-white rounded-[2rem] relative"
               >
-                {/* Cabeçalho com Imagem */}
-                <div className="relative h-48 w-full">
+                {/* Imagem de Capa do Evento com Gradiente */}
+                <div className="relative h-56 w-full">
                     <Image 
-                      src={event?.coverUrl || "https://picsum.photos/seed/event/600/400"} 
+                      src={event?.coverUrl || "https://picsum.photos/seed/event/800/600"} 
                       alt="Capa do Evento" 
                       fill 
                       className="object-cover"
-                      unoptimized // Ajuda com CORS no html2canvas
+                      unoptimized 
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-6">
-                      <Badge className="bg-primary text-white w-fit mb-2 shadow-lg">{ticket.ticketName}</Badge>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent flex flex-col justify-end p-8">
+                      <Badge className="bg-primary text-white w-fit mb-3 shadow-lg font-black uppercase text-[10px] tracking-widest border-none">{ticket.ticketName}</Badge>
                       <h2 className="text-white font-black text-2xl font-headline leading-tight line-clamp-2">{event?.title}</h2>
                     </div>
                 </div>
                 
-                {/* Corpo do Ingresso */}
-                <div className="p-8 space-y-8 relative">
-                    <div className="grid grid-cols-2 gap-6">
+                {/* Área de Informações */}
+                <div className="p-8 space-y-8 bg-white relative">
+                    <div className="grid grid-cols-2 gap-8">
                       <div className="space-y-1">
-                        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">DATA DO EVENTO</p>
-                        <p className="font-bold flex items-center gap-2 text-sm">
+                        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">DATA DO EVENTO</p>
+                        <p className="font-bold flex items-center gap-2 text-sm text-foreground">
                           <Calendar className="h-4 w-4 text-primary" />
                           {event?.startAt ? format(event.startAt.toDate(), "dd/MM/yyyy", { locale: ptBR }) : '--/--/--'}
                         </p>
                       </div>
-                      <div className="space-y-1">
-                        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">HORÁRIO</p>
-                        <p className="font-bold text-sm">
+                      <div className="space-y-1 border-l pl-4">
+                        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">HORÁRIO</p>
+                        <p className="font-bold text-sm text-foreground">
                           {event?.startAt ? format(event.startAt.toDate(), "HH:mm'h'", { locale: ptBR }) : '--:--'}
                         </p>
                       </div>
                     </div>
 
                     <div className="space-y-1">
-                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">TITULAR DO INGRESSO</p>
-                      <p className="font-bold flex items-center gap-2 text-base text-foreground">
+                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">TITULAR DO INGRESSO</p>
+                      <p className="font-bold flex items-center gap-3 text-base text-foreground bg-muted/20 p-3 rounded-xl border border-muted/50">
                         <User className="h-5 w-5 text-primary" />
                         {ticket.userName}
                       </p>
                     </div>
 
                     <div className="space-y-1">
-                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">LOCALIZAÇÃO</p>
-                      <p className="text-sm font-medium flex items-start gap-2 leading-tight">
+                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">LOCALIZAÇÃO</p>
+                      <p className="text-sm font-medium flex items-start gap-2 leading-snug text-muted-foreground">
                         <MapPin className="h-4 w-4 text-primary mt-0.5 shrink-0" />
                         <span>{event?.address}, {event?.city} - {event?.state}</span>
                       </p>
                     </div>
 
-                    {/* Divisória Serrilhada */}
-                    <div className="absolute -bottom-[1px] left-0 w-full flex items-center justify-between">
-                      <div className="w-6 h-6 bg-muted/30 rounded-full -ml-3 shadow-inner" />
-                      <div className="flex-1 border-t-2 border-dashed border-muted-foreground/20 mx-1" />
-                      <div className="w-6 h-6 bg-muted/30 rounded-full -mr-3 shadow-inner" />
+                    {/* Linha Serrilhada de Recorte */}
+                    <div className="absolute -bottom-[20px] left-0 w-full flex items-center justify-between z-10">
+                      <div className="w-8 h-8 bg-muted/30 rounded-full -ml-4" />
+                      <div className="flex-1 border-t-2 border-dashed border-muted-foreground/30 mx-2" />
+                      <div className="w-8 h-8 bg-muted/30 rounded-full -mr-4" />
                     </div>
                 </div>
 
-                {/* QR Code Stub */}
-                <div className="p-8 bg-muted/5 flex flex-col items-center justify-center space-y-6">
-                    <div className="bg-white p-4 rounded-2xl shadow-xl border border-primary/5">
+                {/* Área do QR Code com Fundo Destacado */}
+                <div className="p-10 bg-muted/5 flex flex-col items-center justify-center space-y-6 pt-12">
+                    <div className="bg-white p-5 rounded-3xl shadow-2xl border-4 border-white transform hover:scale-105 transition-transform">
                        <Image 
                          src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${ticket.id}`} 
                          alt="QR Code Validação" 
-                         width={160}
-                         height={160}
+                         width={180}
+                         height={180}
                          className="object-contain"
                          unoptimized
                        />
                     </div>
                     
                     <div className="text-center space-y-2">
-                      <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">CÓDIGO ÚNICO</p>
-                      <p className="font-mono text-[11px] font-bold text-foreground bg-muted/50 px-3 py-1 rounded-md border border-muted/50">{ticket.id}</p>
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">IDENTIFICADOR ÚNICO</p>
+                      <p className="font-mono text-xs font-bold text-primary bg-primary/5 px-4 py-2 rounded-lg border border-primary/10 tracking-wider">
+                        #{ticket.id.toUpperCase()}
+                      </p>
                     </div>
                 </div>
                 
-                <div className="h-3 bg-primary/10 w-full" />
+                <div className="h-4 bg-primary w-full" />
               </Card>
 
-              {/* Botão de Download PDF individual */}
+              {/* Botão de Download PDF */}
               <Button 
                 onClick={() => handleDownloadPDF(ticket.id)}
                 disabled={downloadingId === ticket.id}
-                className="w-full bg-secondary hover:bg-secondary/90 text-white font-black h-12 rounded-2xl shadow-lg shadow-secondary/20 transition-all active:scale-95"
+                className="w-full bg-secondary hover:bg-secondary/90 text-white font-black h-14 rounded-2xl shadow-xl shadow-secondary/20 transition-all active:scale-95 text-lg"
               >
                 {downloadingId === ticket.id ? (
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  <Loader2 className="mr-3 h-6 w-6 animate-spin" />
                 ) : (
-                  <FileText className="mr-2 h-5 w-5" />
+                  <FileText className="mr-3 h-6 w-6" />
                 )}
                 BAIXAR INGRESSO (PDF)
               </Button>
@@ -225,8 +235,8 @@ export default function OrderTicketsPage() {
           ))}
 
           {tickets.length === 0 && (
-            <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-muted/50 w-full max-w-xl">
-              <Download className="h-16 w-16 mx-auto text-muted-foreground mb-4 opacity-10" />
+            <div className="text-center py-20 bg-white rounded-[2rem] border-2 border-dashed border-muted/50 w-full max-w-xl shadow-sm">
+              <FileText className="h-16 w-16 mx-auto text-muted-foreground mb-4 opacity-10" />
               <p className="text-muted-foreground font-bold">Nenhum ingresso encontrado para este pedido.</p>
               <Button variant="link" onClick={() => router.push('/')}>Voltar para o início</Button>
             </div>

@@ -64,8 +64,8 @@ import {
   Upload,
   Save,
   ImageIcon,
-  ExternalLink,
-  Eye
+  Eye,
+  RotateCcw
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -141,6 +141,7 @@ export default function ManageEventPage() {
       query(collection(db, 'ingressos'), where('eventId', '==', eventId)),
       (snapshot) => {
         const ticketsData = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as EventTicket));
+        // Sort in client side to avoid index requirement error
         ticketsData.sort((a, b) => {
             const dateA = a.createdAt?.toMillis() || 0;
             const dateB = b.createdAt?.toMillis() || 0;
@@ -294,6 +295,18 @@ export default function ManageEventPage() {
     }
   };
 
+  const handleUndoCheckIn = async (ticketId: string) => {
+    try {
+      await updateDoc(doc(db, 'ingressos', ticketId), {
+        status: 'ativo',
+        checkedInAt: null
+      });
+      toast({ title: 'Check-in desfeito', description: 'O ingresso voltou ao status ativo.' });
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível desfazer o check-in.' });
+    }
+  };
+
   const filteredTickets = useMemo(() => {
     return tickets.filter(t => 
       t.userName.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -377,7 +390,7 @@ export default function ManageEventPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="border-none shadow-sm"><CardHeader className="pb-2 text-muted-foreground text-sm font-bold">VENDIDOS</CardHeader><CardContent><div className="text-3xl font-black">{totalSold} / {totalCapacity}</div></CardContent></Card>
             <Card className="border-none shadow-sm"><CardHeader className="pb-2 text-muted-foreground text-sm font-bold">PRESENÇA</CardHeader><CardContent><div className="text-3xl font-black">{totalCheckIns} ({totalSold > 0 ? Math.round((totalCheckIns/totalSold)*100) : 0}%)</div></CardContent></Card>
-            <Card className="border-none shadow-sm"><CardHeader className="pb-2 text-muted-foreground text-sm font-bold">RECEITA</CardHeader><CardContent><div className="text-3xl font-black text-secondary">R$ {tickets.reduce((acc, t) => acc + (0), 0).toFixed(2)}</div></CardContent></Card>
+            <Card className="border-none shadow-sm"><CardHeader className="pb-2 text-muted-foreground text-sm font-bold">RECEITA ESTIMADA</CardHeader><CardContent><div className="text-3xl font-black text-secondary">R$ {tickets.length > 0 ? '---' : '0,00'}</div></CardContent></Card>
           </div>
 
           <Card className="border-none shadow-sm">
@@ -454,7 +467,7 @@ export default function ManageEventPage() {
           <Card className="border-none shadow-sm">
             <CardHeader>
               <CardTitle>Controle de Entrada</CardTitle>
-              <CardDescription>Busque pelo nome, e-mail ou código do ingresso para realizar o check-in.</CardDescription>
+              <CardDescription>Busque pelo nome ou código. Use "Estornar" para desfazer entradas erradas.</CardDescription>
               <div className="pt-4 flex items-center gap-4">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -465,7 +478,7 @@ export default function ManageEventPage() {
                     onChange={e => setSearchTerm(e.target.value)} 
                   />
                 </div>
-                <Badge variant="secondary" className="h-10 px-4 font-bold">{totalCheckIns} entradas confirmadas</Badge>
+                <Badge variant="secondary" className="h-10 px-4 font-bold">{totalCheckIns} de {totalSold} confirmados</Badge>
               </div>
             </CardHeader>
             <Table>
@@ -486,22 +499,26 @@ export default function ManageEventPage() {
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="font-mono text-[10px]">{t.ticketName}</Badge>
-                      <div className="text-[10px] text-muted-foreground mt-1">ID: {t.id}</div>
                     </TableCell>
                     <TableCell>
                       <Badge variant={t.status === 'usado' ? 'default' : 'secondary'} className={t.status === 'usado' ? 'bg-green-500' : ''}>
                         {t.status === 'usado' ? 'ENTROU' : 'PENDENTE'}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right flex items-center justify-end gap-2">
                       {t.status !== 'usado' ? (
                         <Button size="sm" onClick={() => handleCheckIn(t.id)} className="bg-secondary text-white font-bold">
                           <UserCheck className="mr-2 h-4 w-4" /> CONFIRMAR
                         </Button>
                       ) : (
-                        <span className="text-xs text-muted-foreground font-bold flex items-center justify-end gap-1">
-                          <CheckCircle2 className="h-4 w-4 text-green-500" /> {t.checkedInAt ? format(t.checkedInAt.toDate(), "HH:mm") : ''}
-                        </span>
+                        <>
+                          <span className="text-xs text-muted-foreground font-bold flex items-center gap-1">
+                            <CheckCircle2 className="h-4 w-4 text-green-500" /> {t.checkedInAt ? format(t.checkedInAt.toDate(), "HH:mm") : ''}
+                          </span>
+                          <Button variant="ghost" size="sm" onClick={() => handleUndoCheckIn(t.id)} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                            <RotateCcw className="h-4 w-4 mr-1" /> ESTORNAR
+                          </Button>
+                        </>
                       )}
                     </TableCell>
                   </TableRow>
