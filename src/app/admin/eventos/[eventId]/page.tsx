@@ -126,10 +126,22 @@ export default function ManageEventPage() {
       }
     );
 
+    // ✅ Removido o orderBy para evitar erro de índice ausente no Firestore
     const unsubTickets = onSnapshot(
-      query(collection(db, 'ingressos'), where('eventId', '==', eventId), orderBy('createdAt', 'desc')),
+      query(collection(db, 'ingressos'), where('eventId', '==', eventId)),
       (snapshot) => {
-        setTickets(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as EventTicket)));
+        const ticketsData = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as EventTicket));
+        // Ordenação manual no lado do cliente
+        ticketsData.sort((a, b) => {
+            const dateA = a.createdAt?.toMillis() || 0;
+            const dateB = b.createdAt?.toMillis() || 0;
+            return dateB - dateA;
+        });
+        setTickets(ticketsData);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Erro ao carregar ingressos:", error);
         setLoading(false);
       }
     );
@@ -394,7 +406,6 @@ export default function ManageEventPage() {
         </TabsContent>
 
         <TabsContent value="tickets" className="space-y-6">
-           {/* CRUD de Ingressos Reutilizado */}
            <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold font-headline">Lotes e Preços</h2>
               <Button onClick={() => { setEditingTicket(null); setIsTicketModalOpen(true); }}><Plus className="mr-2 h-4 w-4" /> Adicionar Lote</Button>
