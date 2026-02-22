@@ -10,12 +10,6 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import MercadoPagoConfig, { Payment } from 'mercadopago';
 
-// O token deve ser configurado via variável de ambiente para segurança.
-const client = new MercadoPagoConfig({
-  accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN || '',
-  options: { timeout: 5000 }
-});
-
 const CreatePaymentInputSchema = z.object({
   amount: z.number().describe('Valor total do pagamento em Reais (ex: 150.00).'),
   email: z.string().email().describe('E-mail do pagador.'),
@@ -36,9 +30,16 @@ const createPaymentFlow = ai.defineFlow(
     inputSchema: CreatePaymentInputSchema,
   },
   async (input) => {
-    if (!process.env.MERCADO_PAGO_ACCESS_TOKEN) {
-      throw new Error('Atenção Desenvolvedor: MERCADO_PAGO_ACCESS_TOKEN não foi configurado nas variáveis de ambiente.');
+    const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
+
+    if (!accessToken || accessToken === 'SEU_TOKEN_AQUI') {
+      throw new Error('CONFIGURAÇÃO NECESSÁRIA: Você precisa colar o seu Access Token do Mercado Pago no arquivo .env (MERCADO_PAGO_ACCESS_TOKEN).');
     }
+
+    const client = new MercadoPagoConfig({
+      accessToken: accessToken,
+      options: { timeout: 10000 } // Aumentado para evitar timeouts em conexões lentas
+    });
 
     const payment = new Payment(client);
     
@@ -60,7 +61,6 @@ const createPaymentFlow = ai.defineFlow(
           number: input.identificationNumber.replace(/\D/g, ''),
         },
       },
-      // Nas credenciais de teste, o MP pode exigir campos adicionais dependendo da configuração da conta
       installments: 1,
     };
 
@@ -77,7 +77,7 @@ const createPaymentFlow = ai.defineFlow(
       };
     } catch (error: any) {
       console.error('Erro detalhado Mercado Pago:', error.message || error);
-      // Se for erro de validação (comum em sandbox), tentamos dar um retorno mais amigável
+      // Erro amigável para o usuário final
       const errorMessage = error.cause?.[0]?.description || error.message || 'Erro ao processar PIX.';
       throw new Error(`Mercado Pago: ${errorMessage}`);
     }
