@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -63,49 +62,61 @@ export default function OrderTicketsPage() {
     if (!element) return;
 
     setDownloadingId(ticketId);
-    toast({ title: 'Gerando PDF...', description: 'Processando seu ingresso de alta qualidade.' });
+    toast({ title: 'Gerando PDF...', description: 'Processando seu ingresso.' });
 
     try {
-      // Captura o elemento com configurações otimizadas para PDF
+      // Remove sombras e efeitos durante a captura
+      element.classList.add('pdf-mode');
+      // Pequeno delay para garantir que o navegador atualize o estilo
+      await new Promise((r) => setTimeout(r, 100));
+
       const canvas = await html2canvas(element, {
-        scale: 3, // Aumenta drasticamente a qualidade para impressão
+        scale: 2.5,                 
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
-        windowWidth: element.scrollWidth,
-        windowHeight: element.scrollHeight,
+        scrollX: 0,
+        scrollY: -window.scrollY, 
       });
 
-      const imgData = canvas.toDataURL('image/png', 1.0);
+      const imgData = canvas.toDataURL('image/jpeg', 0.98);
+
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
         format: 'a4',
       });
 
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      
-      // Calcula dimensões para o card ficar centralizado e grande no A4
-      const canvasWidth = canvas.width;
-      const canvasHeight = canvas.height;
-      const ratio = canvasHeight / canvasWidth;
-      
-      const imgWidth = pdfWidth * 0.85; // Ocupa 85% da largura da folha
-      const imgHeight = imgWidth * ratio;
-      
-      const marginX = (pdfWidth - imgWidth) / 2;
-      const marginY = (pdfHeight - imgHeight) / 2;
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const margin = 10;
 
-      // Adiciona a imagem ao PDF (se for muito alto, pode precisar de ajuste, mas tickets verticais costumam caber)
-      pdf.addImage(imgData, 'PNG', marginX, Math.max(10, marginY), imgWidth, imgHeight);
+      const maxW = pageW - margin * 2;
+      const maxH = pageH - margin * 2;
+
+      // Primeiro tenta usar a largura máxima
+      let imgW = maxW;
+      let imgH = (canvas.height * imgW) / canvas.width;
+
+      // Se ficar alto demais, ajusta pela altura máxima para não cortar o QR Code
+      if (imgH > maxH) {
+        imgH = maxH;
+        imgW = (canvas.width * imgH) / canvas.height;
+      }
+
+      // Centraliza na página
+      const x = (pageW - imgW) / 2;
+      const y = (pageH - imgH) / 2;
+
+      pdf.addImage(imgData, 'JPEG', x, y, imgW, imgH, undefined, 'FAST');
       pdf.save(`ingresso-${ticketId}.pdf`);
 
       toast({ title: 'Pronto!', description: 'Seu ingresso foi baixado com sucesso.' });
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
-      toast({ variant: 'destructive', title: 'Erro ao baixar', description: 'Ocorreu uma falha na geração do arquivo.' });
+      toast({ variant: 'destructive', title: 'Erro ao baixar', description: 'Não foi possível gerar o arquivo PDF.' });
     } finally {
+      element.classList.remove('pdf-mode');
       setDownloadingId(null);
     }
   };
@@ -135,7 +146,7 @@ export default function OrderTicketsPage() {
               {/* O Card do Ingresso Vertical Profissional */}
               <Card 
                 ref={(el) => { ticketRefs.current[ticket.id] = el; }}
-                className="w-full border-none shadow-[0_30px_60px_rgba(0,0,0,0.2)] overflow-hidden flex flex-col bg-white rounded-[2rem] relative"
+                className="w-full border-none shadow-[0_30px_60px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col bg-white rounded-[2rem] relative"
               >
                 {/* Imagem de Capa do Evento com Gradiente */}
                 <div className="relative h-56 w-full">

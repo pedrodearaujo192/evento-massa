@@ -62,3 +62,14 @@
     @apply font-headline;
   }
 }
+
+/* Modo de Impressão PDF para evitar distorções de renderização */
+.pdf-mode {
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.pdf-mode * {
+  animation: none !important;
+  transition: none !important;
+}
