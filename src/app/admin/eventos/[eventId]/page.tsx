@@ -18,7 +18,7 @@ import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage
 import { db, storage } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@//components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -63,12 +63,15 @@ import {
   UserCheck,
   Upload,
   Save,
-  ImageIcon
+  ImageIcon,
+  ExternalLink,
+  Eye
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Image from 'next/image';
+import Link from 'next/link';
 
 interface TicketType {
   id: string;
@@ -364,9 +367,9 @@ export default function ManageEventPage() {
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList className="bg-muted/50 p-1 rounded-lg">
           <TabsTrigger value="overview" className="gap-2"><BarChart3 className="h-4 w-4" /> Visão Geral</TabsTrigger>
-          <TabsTrigger value="tickets" className="gap-2"><Ticket className="h-4 w-4" /> Ingressos</TabsTrigger>
-          <TabsTrigger value="checkin" className="gap-2"><UserCheck className="h-4 w-4" /> Check-in</TabsTrigger>
+          <TabsTrigger value="tickets" className="gap-2"><Ticket className="h-4 w-4" /> Lotes</TabsTrigger>
           <TabsTrigger value="participants" className="gap-2"><Users className="h-4 w-4" /> Participantes</TabsTrigger>
+          <TabsTrigger value="checkin" className="gap-2"><UserCheck className="h-4 w-4" /> Check-in</TabsTrigger>
           <TabsTrigger value="settings" className="gap-2"><Settings className="h-4 w-4" /> Configurações</TabsTrigger>
         </TabsList>
 
@@ -389,6 +392,61 @@ export default function ManageEventPage() {
                   <Image src={event.coverUrl || "https://picsum.photos/seed/1/600/400"} alt="Capa" fill className="object-cover" />
                 </div>
              </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="participants" className="space-y-4">
+          <Card className="border-none shadow-sm">
+            <CardHeader>
+              <CardTitle>Lista de Participantes</CardTitle>
+              <CardDescription>Visualize todos os inscritos e acesse seus ingressos individuais.</CardDescription>
+              <div className="pt-4 flex items-center gap-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Buscar participante..." 
+                    className="pl-10" 
+                    value={searchTerm} 
+                    onChange={e => setSearchTerm(e.target.value)} 
+                  />
+                </div>
+              </div>
+            </CardHeader>
+            <Table>
+              <TableHeader className="bg-muted/50">
+                <TableRow>
+                  <TableHead>Participante</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Ação</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredTickets.map(t => (
+                  <TableRow key={t.id}>
+                    <TableCell>
+                      <div className="font-bold">{t.userName}</div>
+                      <div className="text-xs text-muted-foreground">{t.userEmail}</div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="font-mono text-[10px]">{t.ticketName}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={t.status === 'usado' ? 'default' : 'secondary'} className={t.status === 'usado' ? 'bg-green-500' : ''}>
+                        {t.status === 'usado' ? 'CHECK-IN FEITO' : 'ATIVO'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={`/ingressos/${t.orderId}`} target="_blank">
+                          <Eye className="mr-2 h-4 w-4" /> VER INGRESSO
+                        </Link>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </Card>
         </TabsContent>
 
