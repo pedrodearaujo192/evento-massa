@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -9,18 +9,25 @@ import { Navbar } from '@/components/navbar';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, MapPin, Calendar, Ticket, User, ArrowLeft, QrCode as QrCodeIcon } from 'lucide-react';
+import { Loader2, MapPin, Calendar, User, ArrowLeft, Download, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Image from 'next/image';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+import { useToast } from '@/hooks/use-toast';
 
 export default function OrderTicketsPage() {
   const { orderId } = useParams();
   const router = useRouter();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [order, setOrder] = useState<any>(null);
   const [event, setEvent] = useState<any>(null);
   const [tickets, setTickets] = useState<any[]>([]);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const ticketRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
     if (!orderId) return;
@@ -51,6 +58,50 @@ export default function OrderTicketsPage() {
     fetchData();
   }, [orderId, router]);
 
+  const handleDownloadPDF = async (ticketId: string) => {
+    const element = ticketRefs.current[ticketId];
+    if (!element) return;
+
+    setDownloadingId(ticketId);
+    toast({ title: 'Gerando ingresso...', description: 'Aguarde um momento.' });
+
+    try {
+      // Captura o elemento como canvas
+      const canvas = await html2canvas(element, {
+        scale: 2, // Aumenta a qualidade
+        useCORS: true, // Necessário para imagens de outros domínios (Firebase/Picsum)
+        logging: false,
+        backgroundColor: '#ffffff',
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      // Calcula as dimensões para caber no A4 centralizado
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      
+      const marginX = (pdfWidth - (pdfWidth * 0.8)) / 2;
+      const finalWidth = pdfWidth * 0.8;
+      const finalHeight = (imgProps.height * finalWidth) / imgProps.width;
+
+      pdf.addImage(imgData, 'PNG', marginX, 10, finalWidth, finalHeight);
+      pdf.save(`ingresso-${ticketId}.pdf`);
+
+      toast({ title: 'Sucesso!', description: 'Seu ingresso foi baixado.' });
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      toast({ variant: 'destructive', title: 'Erro ao baixar', description: 'Não foi possível gerar o PDF agora.' });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
   if (loading) return <div className="flex h-screen items-center justify-center bg-background"><Loader2 className="animate-spin text-primary h-12 w-12" /></div>;
 
   return (
@@ -70,101 +121,112 @@ export default function OrderTicketsPage() {
            </Badge>
         </div>
 
-        <div className="flex flex-wrap gap-10 justify-center">
-          {tickets.map((ticket, idx) => (
-            <Card key={ticket.id} className="w-full max-w-[380px] border-none shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col bg-white rounded-3xl group">
-               {/* Ticket Header: Imagem do Evento */}
-               <div className="relative h-48 w-full">
-                  <Image 
-                    src={event?.coverUrl || "https://picsum.photos/seed/event/600/400"} 
-                    alt="Capa do Evento" 
-                    fill 
-                    className="object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-6">
-                    <Badge className="bg-primary text-white w-fit mb-2 shadow-lg">{ticket.ticketName}</Badge>
-                    <h2 className="text-white font-black text-2xl font-headline leading-tight line-clamp-2">{event?.title}</h2>
-                  </div>
-               </div>
-               
-               {/* Ticket Body: Info Principal */}
-               <div className="p-8 space-y-8 relative">
-                  {/* Detalhes do Evento */}
-                  <div className="grid grid-cols-2 gap-6">
+        <div className="flex flex-wrap gap-12 justify-center">
+          {tickets.map((ticket) => (
+            <div key={ticket.id} className="flex flex-col gap-4 items-center max-w-[380px] w-full">
+              {/* O Card do Ingresso com Ref para captura */}
+              <Card 
+                ref={(el) => { ticketRefs.current[ticket.id] = el; }}
+                className="w-full border-none shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col bg-white rounded-3xl group"
+              >
+                {/* Cabeçalho com Imagem */}
+                <div className="relative h-48 w-full">
+                    <Image 
+                      src={event?.coverUrl || "https://picsum.photos/seed/event/600/400"} 
+                      alt="Capa do Evento" 
+                      fill 
+                      className="object-cover"
+                      unoptimized // Ajuda com CORS no html2canvas
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-6">
+                      <Badge className="bg-primary text-white w-fit mb-2 shadow-lg">{ticket.ticketName}</Badge>
+                      <h2 className="text-white font-black text-2xl font-headline leading-tight line-clamp-2">{event?.title}</h2>
+                    </div>
+                </div>
+                
+                {/* Corpo do Ingresso */}
+                <div className="p-8 space-y-8 relative">
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-1">
+                        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">DATA DO EVENTO</p>
+                        <p className="font-bold flex items-center gap-2 text-sm">
+                          <Calendar className="h-4 w-4 text-primary" />
+                          {event?.startAt ? format(event.startAt.toDate(), "dd/MM/yyyy", { locale: ptBR }) : '--/--/--'}
+                        </p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">HORÁRIO</p>
+                        <p className="font-bold text-sm">
+                          {event?.startAt ? format(event.startAt.toDate(), "HH:mm'h'", { locale: ptBR }) : '--:--'}
+                        </p>
+                      </div>
+                    </div>
+
                     <div className="space-y-1">
-                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">DATA DO EVENTO</p>
-                      <p className="font-bold flex items-center gap-2 text-sm">
-                        <Calendar className="h-4 w-4 text-primary" />
-                        {event?.startAt ? format(event.startAt.toDate(), "dd/MM/yyyy", { locale: ptBR }) : '--/--/--'}
+                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">TITULAR DO INGRESSO</p>
+                      <p className="font-bold flex items-center gap-2 text-base text-foreground">
+                        <User className="h-5 w-5 text-primary" />
+                        {ticket.userName}
                       </p>
                     </div>
+
                     <div className="space-y-1">
-                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">HORÁRIO</p>
-                      <p className="font-bold text-sm">
-                        {event?.startAt ? format(event.startAt.toDate(), "HH:mm'h'", { locale: ptBR }) : '--:--'}
+                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">LOCALIZAÇÃO</p>
+                      <p className="text-sm font-medium flex items-start gap-2 leading-tight">
+                        <MapPin className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                        <span>{event?.address}, {event?.city} - {event?.state}</span>
                       </p>
                     </div>
-                  </div>
 
-                  <div className="space-y-1">
-                    <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">TITULAR DO INGRESSO</p>
-                    <p className="font-bold flex items-center gap-2 text-base text-foreground">
-                      <User className="h-5 w-5 text-primary" />
-                      {ticket.userName}
-                    </p>
-                  </div>
+                    {/* Divisória Serrilhada */}
+                    <div className="absolute -bottom-[1px] left-0 w-full flex items-center justify-between">
+                      <div className="w-6 h-6 bg-muted/30 rounded-full -ml-3 shadow-inner" />
+                      <div className="flex-1 border-t-2 border-dashed border-muted-foreground/20 mx-1" />
+                      <div className="w-6 h-6 bg-muted/30 rounded-full -mr-3 shadow-inner" />
+                    </div>
+                </div>
 
-                  <div className="space-y-1">
-                    <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">LOCALIZAÇÃO</p>
-                    <p className="text-sm font-medium flex items-start gap-2 leading-tight">
-                      <MapPin className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                      <span>{event?.address}, {event?.city} - {event?.state}</span>
-                    </p>
-                  </div>
-
-                  {/* Divisória Serrilhada (Notches) */}
-                  <div className="absolute -bottom-[1px] left-0 w-full flex items-center justify-between px-[-12px]">
-                    <div className="w-6 h-6 bg-muted/30 rounded-full -ml-3 shadow-inner" />
-                    <div className="flex-1 border-t-2 border-dashed border-muted-foreground/20 mx-1" />
-                    <div className="w-6 h-6 bg-muted/30 rounded-full -mr-3 shadow-inner" />
-                  </div>
-               </div>
-
-               {/* Ticket Stub: QR Code e Validação */}
-               <div className="p-8 bg-muted/5 flex flex-col items-center justify-center space-y-6">
-                  <div className="bg-white p-4 rounded-2xl shadow-xl border border-primary/5 transition-transform hover:scale-105 duration-300">
-                     <Image 
-                       src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${ticket.id}`} 
-                       alt="QR Code Validação" 
-                       width={180}
-                       height={180}
-                       className="object-contain"
-                       priority
-                     />
-                  </div>
-                  
-                  <div className="text-center space-y-3">
-                    <div className="space-y-1">
-                      <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">CÓDIGO DE VALIDAÇÃO</p>
-                      <p className="font-mono text-[11px] font-bold text-foreground bg-muted/50 px-3 py-1 rounded-md border border-muted/50">{ticket.id}</p>
+                {/* QR Code Stub */}
+                <div className="p-8 bg-muted/5 flex flex-col items-center justify-center space-y-6">
+                    <div className="bg-white p-4 rounded-2xl shadow-xl border border-primary/5">
+                       <Image 
+                         src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${ticket.id}`} 
+                         alt="QR Code Validação" 
+                         width={160}
+                         height={160}
+                         className="object-contain"
+                         unoptimized
+                       />
                     </div>
                     
-                    <Button variant="secondary" size="sm" className="font-bold text-[11px] h-9 px-6 rounded-full shadow-lg shadow-secondary/20" asChild>
-                       <a href={`https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${ticket.id}`} download target="_blank">
-                         BAIXAR QR CODE
-                       </a>
-                    </Button>
-                  </div>
-               </div>
-               
-               {/* Decoração Final */}
-               <div className="h-4 bg-primary/10 w-full" />
-            </Card>
+                    <div className="text-center space-y-2">
+                      <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">CÓDIGO ÚNICO</p>
+                      <p className="font-mono text-[11px] font-bold text-foreground bg-muted/50 px-3 py-1 rounded-md border border-muted/50">{ticket.id}</p>
+                    </div>
+                </div>
+                
+                <div className="h-3 bg-primary/10 w-full" />
+              </Card>
+
+              {/* Botão de Download PDF individual */}
+              <Button 
+                onClick={() => handleDownloadPDF(ticket.id)}
+                disabled={downloadingId === ticket.id}
+                className="w-full bg-secondary hover:bg-secondary/90 text-white font-black h-12 rounded-2xl shadow-lg shadow-secondary/20 transition-all active:scale-95"
+              >
+                {downloadingId === ticket.id ? (
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                ) : (
+                  <FileText className="mr-2 h-5 w-5" />
+                )}
+                BAIXAR INGRESSO (PDF)
+              </Button>
+            </div>
           ))}
 
           {tickets.length === 0 && (
             <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-muted/50 w-full max-w-xl">
-              <QrCodeIcon className="h-16 w-16 mx-auto text-muted-foreground mb-4 opacity-10" />
+              <Download className="h-16 w-16 mx-auto text-muted-foreground mb-4 opacity-10" />
               <p className="text-muted-foreground font-bold">Nenhum ingresso encontrado para este pedido.</p>
               <Button variant="link" onClick={() => router.push('/')}>Voltar para o início</Button>
             </div>
