@@ -4,11 +4,12 @@ import MercadoPagoConfig, { Preference } from 'mercadopago';
 
 export async function POST(req: Request) {
   try {
+    // Busca o token em ambas as variações comuns de nome no .env
     const token = (process.env.MERCADOPAGO_ACCESS_TOKEN || process.env.MERCADO_PAGO_ACCESS_TOKEN || '').trim();
 
-    if (!token) {
+    if (!token || token === 'SEU_TOKEN_AQUI') {
       return NextResponse.json(
-        { error: 'Token do Mercado Pago não configurado no .env' },
+        { error: 'Token do Mercado Pago não configurado no arquivo .env' },
         { status: 500 }
       );
     }
@@ -22,11 +23,12 @@ export async function POST(req: Request) {
     
     const preference = new Preference(client);
 
-    // DETECÇÃO DINÂMICA: Isso evita que o back_urls.success fique vazio no ambiente do Studio
+    // DETECÇÃO DINÂMICA DA URL: Garante que a URL seja absoluta (http/https + host)
+    // Isso é crucial para o Mercado Pago aceitar o back_urls.success
     const origin = new URL(req.url).origin;
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || origin;
 
-    console.log(`Gerando preferência para o pedido ${orderId} com siteUrl: ${siteUrl}`);
+    console.log(`[Mercado Pago] Gerando preferência: Pedido ${orderId} | Site URL: ${siteUrl}`);
 
     const body = {
       external_reference: String(orderId),
@@ -40,14 +42,16 @@ export async function POST(req: Request) {
         },
       ],
       payer: {
-        email: buyerEmail,
-        name: buyerName,
+        email: buyerEmail.trim(),
+        name: buyerName.trim(),
       },
+      // O Mercado Pago exige URLs ABSOLUTAS aqui
       back_urls: {
         success: `${siteUrl}/pagamento/sucesso?orderId=${orderId}`,
         pending: `${siteUrl}/pagamento/sucesso?orderId=${orderId}`,
         failure: `${siteUrl}/pagamento/erro?orderId=${orderId}`,
       },
+      // Se auto_return for 'approved', back_urls.success DEVE estar definido e ser absoluto
       auto_return: 'approved' as const,
       payment_methods: {
         excluded_payment_types: [],
@@ -63,9 +67,13 @@ export async function POST(req: Request) {
       sandbox_init_point: result.sandbox_init_point,
     });
   } catch (err: any) {
-    console.error('Erro ao criar preferência MP:', err);
+    console.error('[Mercado Pago] Erro ao criar preferência:', err);
+    
+    // Captura mensagens específicas da API do Mercado Pago para ajudar no debug
+    const mpErrorMessage = err.cause?.[0]?.description || err.message || 'Erro ao processar checkout.';
+    
     return NextResponse.json(
-      { error: err.message || 'Erro ao processar checkout.' }, 
+      { error: `Erro Mercado Pago: ${mpErrorMessage}` }, 
       { status: 500 }
     );
   }
