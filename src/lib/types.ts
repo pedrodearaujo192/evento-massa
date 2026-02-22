@@ -45,16 +45,17 @@ export interface Event {
   updatedAt: Timestamp;
 }
 
-export interface CertificateConfig {
-  enabled: boolean;
-  attendanceMode: 'STRICT' | 'EOD' | 'SIMPLE';
-  title: string;
-  bodyTemplate: string;
-  workloadHours?: string;
-  signatureName?: string;
-  signatureImageUrl?: string;
-  backgroundImageUrl?: string;
-  updatedAt: Timestamp;
+export interface TicketType {
+  id: string;
+  name: string;
+  description?: string;
+  priceType: 'paid' | 'free';
+  priceCents: number;
+  quantity: number;
+  soldCount: number;
+  active: boolean;
+  salesStartAt: Timestamp;
+  salesEndAt: Timestamp;
 }
 
 export interface Order {
@@ -62,8 +63,21 @@ export interface Order {
   userId: string;
   eventId: string;
   total: number;
-  status: 'pending' | 'paid' | 'cancelled' | 'refunded';
-  paymentMethod: 'manual' | 'pix_externo';
+  status: 'pendente' | 'pago' | 'cancelado';
+  customer: {
+    fullName: string;
+    document: string;
+    email: string;
+    address: string;
+    city: string;
+    zip: string;
+  };
+  items: Array<{
+    id: string;
+    name: string;
+    qty: number;
+    priceCents: number;
+  }>;
   createdAt: Timestamp;
 }
 
@@ -76,17 +90,5 @@ export interface Ticket {
   qrCode: string;
   status: 'ativo' | 'usado' | 'cancelado';
   checkedInAt: Timestamp | null;
-  checkedOutAt: Timestamp | null;
   createdAt: Timestamp;
-}
-
-export interface Certificate {
-  id: string;
-  eventId: string;
-  userId: string;
-  ticketId: string;
-  nomeParticipante: string;
-  tituloEvento: string;
-  dataEmissao: Timestamp;
-  urlPdf?: string;
 }
