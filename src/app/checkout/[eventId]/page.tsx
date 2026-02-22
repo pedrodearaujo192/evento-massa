@@ -82,6 +82,7 @@ export default function CheckoutPage() {
     e.preventDefault();
     setErrorMessage(null);
 
+    // Validação extra de Nome Completo para o Mercado Pago
     if (!formData.fullName.trim().includes(' ')) {
       setErrorMessage('Por favor, insira seu nome completo (Nome e Sobrenome).');
       return;
@@ -96,6 +97,7 @@ export default function CheckoutPage() {
     try {
       let mpPayment = null;
       if (total > 0) {
+        // Tenta criar o pagamento no Mercado Pago
         mpPayment = await createPayment({
           amount: total / 100,
           email: formData.email.trim(),
@@ -106,6 +108,7 @@ export default function CheckoutPage() {
         setPaymentData(mpPayment);
       }
 
+      // Se o pagamento no MP funcionou (ou é free), cria o pedido no Firestore
       const batch = writeBatch(db);
       const orderRef = doc(collection(db, 'pedidos'));
       
@@ -120,7 +123,9 @@ export default function CheckoutPage() {
         createdAt: serverTimestamp()
       });
 
+      // Cria os ingressos individuais
       for (const item of items) {
+        // Atualiza contagem de vendidos
         const typeRef = doc(db, 'eventos', eventId as string, 'ticketTypes', item.id);
         batch.update(typeRef, { soldCount: increment(item.qty) });
         
@@ -147,6 +152,7 @@ export default function CheckoutPage() {
     } catch (e: any) {
       console.error('Erro no checkout:', e);
       setErrorMessage(e.message || 'Erro ao processar pagamento. Tente novamente.');
+      // Rola para o topo para ver a mensagem de erro
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setIsSubmitting(false);

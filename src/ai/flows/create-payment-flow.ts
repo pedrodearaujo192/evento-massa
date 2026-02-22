@@ -64,7 +64,7 @@ const createPaymentFlow = ai.defineFlow(
         },
       };
 
-      // Log de depuração silencioso no servidor
+      // Log de depuração silencioso no servidor para o desenvolvedor
       console.log(`Gerando PIX: R$ ${body.transaction_amount} para ${body.payer.email}`);
 
       const response = await payment.create({ body });
