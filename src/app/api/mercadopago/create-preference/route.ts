@@ -23,10 +23,10 @@ export async function POST(req: Request) {
     
     const preference = new Preference(client);
 
-    // DETECÇÃO DINÂMICA DA URL: Garante que a URL seja absoluta (http/https + host)
-    // Isso é crucial para o Mercado Pago aceitar o back_urls.success
+    // DETECÇÃO DINÂMICA DA URL: Tenta pegar do .env ou reconstrói a partir do request
+    // Em ambientes de proxy (Cloud Workstations), o .env é mais confiável para o MP
     const origin = new URL(req.url).origin;
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || origin;
+    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || origin).replace(/\/$/, '');
 
     console.log(`[Mercado Pago] Gerando preferência: Pedido ${orderId} | Site URL: ${siteUrl}`);
 
@@ -45,13 +45,13 @@ export async function POST(req: Request) {
         email: buyerEmail.trim(),
         name: buyerName.trim(),
       },
-      // O Mercado Pago exige URLs ABSOLUTAS aqui
+      // O Mercado Pago exige URLs ABSOLUTAS e ACESSÍVEIS externamente
       back_urls: {
         success: `${siteUrl}/pagamento/sucesso?orderId=${orderId}`,
         pending: `${siteUrl}/pagamento/sucesso?orderId=${orderId}`,
         failure: `${siteUrl}/pagamento/erro?orderId=${orderId}`,
       },
-      // Se auto_return for 'approved', back_urls.success DEVE estar definido e ser absoluto
+      // Se auto_return for 'approved', back_urls.success DEVE ser absoluto e válido
       auto_return: 'approved' as const,
       payment_methods: {
         excluded_payment_types: [],
