@@ -13,7 +13,8 @@ import {
   serverTimestamp,
   Timestamp 
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { db, storage } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -21,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { 
   Table, 
   TableBody, 
@@ -60,7 +62,10 @@ import {
   ArrowLeft,
   Trash2,
   Edit,
-  MoreHorizontal
+  MoreHorizontal,
+  Upload,
+  Save,
+  ImageIcon
 } from 'lucide-react';
 import { 
   DropdownMenu,
@@ -71,6 +76,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import Image from 'next/image';
 
 interface TicketType {
   id: string;
@@ -95,8 +101,13 @@ export default function ManageEventPage() {
   const [ticketTypes, setTicketTypes] = useState<TicketType[]>([]);
   const [loading, setLoading] = useState(true);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isUpdatingEvent, setIsUpdatingEvent] = useState(false);
   const [isAddingTicket, setIsAddingTicket] = useState(false);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+
+  // Edit Event State
+  const [editImageFile, setEditImageFile] = useState<File | null>(null);
+  const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
 
   // Modal State
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
@@ -109,8 +120,13 @@ export default function ManageEventPage() {
     if (!eventId || !user) return;
 
     const unsubEvent = onSnapshot(doc(db, 'eventos', eventId as string), (doc) => {
-      if (doc.exists()) setEvent({ id: doc.id, ...doc.data() });
-      else router.push('/dashboard');
+      if (doc.exists()) {
+        const data = doc.data();
+        setEvent({ id: doc.id, ...data });
+        if (data.coverUrl) setEditImagePreview(data.coverUrl);
+      } else {
+        router.push('/dashboard');
+      }
     });
 
     const unsubTickets = onSnapshot(
@@ -138,6 +154,56 @@ export default function ManageEventPage() {
       toast({ title: 'Evento publicado!', description: 'O evento agora está visível para o público.' });
     } finally {
       setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleUpdateEvent = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsUpdatingEvent(true);
+    const formData = new FormData(e.currentTarget);
+
+    try {
+      const updateData: any = {
+        title: formData.get('title'),
+        category: formData.get('category'),
+        startAt: Timestamp.fromDate(new Date(formData.get('startAt') as string)),
+        endAt: Timestamp.fromDate(new Date(formData.get('endAt') as string)),
+        city: formData.get('city'),
+        state: formData.get('state'),
+        address: formData.get('address'),
+        capacity: Number(formData.get('capacity')),
+        description: formData.get('description'),
+        updatedAt: serverTimestamp(),
+      };
+
+      if (editImageFile) {
+        // Se houver imagem antiga, você pode optar por deletar, mas vamos focar no upload primeiro
+        const safeName = editImageFile.name.replace(/[^a-zA-Z0-9._-]/g, '-').toLowerCase();
+        const coverPath = `eventos/${eventId}/capa/cover-${Date.now()}-${safeName}`;
+        const imageRef = ref(storage, coverPath);
+        
+        const snap = await uploadBytes(imageRef, editImageFile);
+        const coverUrl = await getDownloadURL(snap.ref);
+        
+        updateData.coverUrl = coverUrl;
+        updateData.coverPath = coverPath;
+      }
+
+      await updateDoc(doc(db, 'eventos', eventId as string), updateData);
+      toast({ title: 'Sucesso', description: 'Evento atualizado com sucesso.' });
+    } catch (error: any) {
+      console.error(error);
+      toast({ variant: 'destructive', title: 'Erro', description: 'Erro ao atualizar o evento.' });
+    } finally {
+      setIsUpdatingEvent(false);
+    }
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setEditImageFile(file);
+      setEditImagePreview(URL.createObjectURL(file));
     }
   };
 
@@ -243,7 +309,6 @@ export default function ManageEventPage() {
         <TabsList className="bg-muted/50 p-1 rounded-lg">
           <TabsTrigger value="overview" className="gap-2"><BarChart3 className="h-4 w-4" /> Visão Geral</TabsTrigger>
           <TabsTrigger value="tickets" className="gap-2"><Ticket className="h-4 w-4" /> Ingressos</TabsTrigger>
-          <TabsTrigger value="attendees" className="gap-2"><Users className="h-4 w-4" /> Vendas</TabsTrigger>
           <TabsTrigger value="settings" className="gap-2"><Settings className="h-4 w-4" /> Configurações</TabsTrigger>
         </TabsList>
 
@@ -254,14 +319,27 @@ export default function ManageEventPage() {
             <Card className="border-none shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Capacidade Local</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{event.capacity}</div><p className="text-xs text-muted-foreground">pessoas no espaço</p></CardContent></Card>
             <Card className="border-none shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Status</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold capitalize">{event.status === 'published' ? 'Ativo' : 'Pausado'}</div></CardContent></Card>
           </div>
-          <Card className="border-none shadow-sm">
-             <CardHeader><CardTitle>Informações do Evento</CardTitle></CardHeader>
-             <CardContent className="space-y-4">
-                <div className="flex items-center gap-3 text-sm"><Calendar className="h-4 w-4 text-primary" /> {event.startAt ? format(event.startAt.toDate(), "dd 'de' MMMM 'às' HH:mm", { locale: ptBR }) : 'Não definido'}</div>
-                <div className="flex items-center gap-3 text-sm"><MapPin className="h-4 w-4 text-primary" /> {event.address}, {event.city} - {event.state}</div>
-                <div className="pt-4"><p className="text-sm text-muted-foreground line-clamp-4">{event.description}</p></div>
-             </CardContent>
-          </Card>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card className="md:col-span-2 border-none shadow-sm">
+               <CardHeader><CardTitle>Informações do Evento</CardTitle></CardHeader>
+               <CardContent className="space-y-4">
+                  <div className="flex items-center gap-3 text-sm"><Calendar className="h-4 w-4 text-primary" /> {event.startAt ? format(event.startAt.toDate(), "dd 'de' MMMM 'às' HH:mm", { locale: ptBR }) : 'Não definido'}</div>
+                  <div className="flex items-center gap-3 text-sm"><MapPin className="h-4 w-4 text-primary" /> {event.address}, {event.city} - {event.state}</div>
+                  <div className="pt-4"><p className="text-sm text-muted-foreground whitespace-pre-wrap">{event.description}</p></div>
+               </CardContent>
+            </Card>
+            <Card className="border-none shadow-sm overflow-hidden">
+               <div className="relative aspect-video w-full">
+                  <Image 
+                    src={event.coverUrl || "https://picsum.photos/seed/default/600/400"} 
+                    alt="Capa" 
+                    fill 
+                    className="object-cover" 
+                  />
+               </div>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="tickets" className="space-y-6">
@@ -368,6 +446,98 @@ export default function ManageEventPage() {
                 {ticketTypes.length === 0 && <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">Nenhum ingresso criado ainda.</TableCell></TableRow>}
               </TableBody>
             </Table>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="settings" className="space-y-6">
+          <Card className="border-none shadow-sm">
+            <CardHeader>
+              <CardTitle>Editar Dados do Evento</CardTitle>
+              <CardDescription>Atualize as informações principais e a imagem de capa.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleUpdateEvent} className="space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Título do Evento</Label>
+                      <Input name="title" defaultValue={event.title} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Categoria</Label>
+                      <select name="category" defaultValue={event.category} className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
+                        <option value="Workshop">Workshop</option>
+                        <option value="Curso">Curso</option>
+                        <option value="Masterclass">Masterclass</option>
+                        <option value="Congresso">Congresso</option>
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Início</Label>
+                        <Input name="startAt" type="datetime-local" defaultValue={event.startAt ? format(event.startAt.toDate(), "yyyy-MM-dd'T'HH:mm") : ''} required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Término</Label>
+                        <Input name="endAt" type="datetime-local" defaultValue={event.endAt ? format(event.endAt.toDate(), "yyyy-MM-dd'T'HH:mm") : ''} required />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <Label>Capa do Evento</Label>
+                    <div className="relative aspect-video rounded-xl border-2 border-dashed flex flex-col items-center justify-center overflow-hidden group">
+                      {editImagePreview ? (
+                        <>
+                          <Image src={editImagePreview} alt="Preview" fill className="object-cover" />
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Label htmlFor="image-change" className="cursor-pointer bg-white text-black px-4 py-2 rounded-lg font-bold">Alterar Imagem</Label>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex flex-col items-center text-muted-foreground">
+                          <ImageIcon className="h-10 w-10 mb-2" />
+                          <span className="text-sm">Clique para subir</span>
+                        </div>
+                      )}
+                      <input id="image-change" type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                   <div className="space-y-2">
+                    <Label>Cidade</Label>
+                    <Input name="city" defaultValue={event.city} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Estado (UF)</Label>
+                    <Input name="state" defaultValue={event.state} maxLength={2} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Capacidade Total</Label>
+                    <Input name="capacity" type="number" defaultValue={event.capacity} required />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Endereço Completo</Label>
+                  <Input name="address" defaultValue={event.address} required />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Descrição e Programação</Label>
+                  <Textarea name="description" defaultValue={event.description} rows={8} required />
+                </div>
+
+                <div className="flex justify-end pt-4">
+                   <Button type="submit" className="bg-primary hover:bg-primary/90 text-white font-bold px-10 h-12" disabled={isUpdatingEvent}>
+                     {isUpdatingEvent ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                     SALVAR ALTERAÇÕES
+                   </Button>
+                </div>
+              </form>
+            </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
