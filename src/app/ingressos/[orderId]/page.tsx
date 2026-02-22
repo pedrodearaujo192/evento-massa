@@ -16,6 +16,22 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { useToast } from '@/hooks/use-toast';
 
+// Helper para garantir que todas as imagens no elemento foram carregadas
+async function waitForImages(root: HTMLElement) {
+  const imgs = Array.from(root.querySelectorAll("img"));
+  await Promise.all(
+    imgs.map(
+      (img) =>
+        img.complete
+          ? Promise.resolve()
+          : new Promise<void>((resolve) => {
+              img.onload = () => resolve();
+              img.onerror = () => resolve();
+            })
+    )
+  );
+}
+
 export default function OrderTicketsPage() {
   const { orderId } = useParams();
   const router = useRouter();
@@ -62,61 +78,78 @@ export default function OrderTicketsPage() {
     if (!element) return;
 
     setDownloadingId(ticketId);
-    toast({ title: 'Gerando PDF...', description: 'Processando seu ingresso.' });
+    toast({ title: 'Gerando PDF...', description: 'Processando seu ingresso em alta qualidade.' });
 
     try {
-      // Remove sombras e efeitos durante a captura
-      element.classList.add('pdf-mode');
-      // Pequeno delay para garantir que o navegador atualize o estilo
-      await new Promise((r) => setTimeout(r, 100));
+      // 1) Garante fontes e imagens carregadas antes do print
+      if (typeof window !== 'undefined' && 'fonts' in document) {
+        await (document as any).fonts.ready;
+      }
+      await waitForImages(element);
 
+      // 2) Captura com ajustes finos no clone
       const canvas = await html2canvas(element, {
-        scale: 2.5,                 
+        scale: 3,
         useCORS: true,
         logging: false,
-        backgroundColor: '#ffffff',
+        backgroundColor: "#ffffff",
         scrollX: 0,
-        scrollY: -window.scrollY, 
+        scrollY: -window.scrollY,
+        onclone: (doc) => {
+          const cloned = doc.querySelector(`[data-ticket-id="${ticketId}"]`) as HTMLElement | null;
+          if (!cloned) return;
+
+          // Força uma “zona segura” pro texto não cortar no PDF
+          const titles = cloned.querySelectorAll("h2");
+          titles.forEach((h2) => {
+            (h2 as HTMLElement).style.lineHeight = "1.2";
+            (h2 as HTMLElement).style.paddingBottom = "4px";
+          });
+
+          // Remove efeitos de animação/transformação durante export
+          const elementsToReset = cloned.querySelectorAll(".transform, .animate-in");
+          elementsToReset.forEach((el) => ((el as HTMLElement).style.transform = "none"));
+        },
       });
 
-      const imgData = canvas.toDataURL('image/jpeg', 0.98);
+      const imgData = canvas.toDataURL("image/png", 1.0);
 
+      // 3) PDF A4 com FIT (não corta)
       const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
       });
 
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
-      const margin = 10;
 
+      const margin = 10; // mm
       const maxW = pageW - margin * 2;
       const maxH = pageH - margin * 2;
 
-      // Primeiro tenta usar a largura máxima
-      let imgW = maxW;
-      let imgH = (canvas.height * imgW) / canvas.width;
+      const ratio = canvas.height / canvas.width;
 
-      // Se ficar alto demais, ajusta pela altura máxima para não cortar o QR Code
+      let imgW = maxW;
+      let imgH = imgW * ratio;
+
+      // Se passar da altura máxima da página, reduz proporcionalmente
       if (imgH > maxH) {
         imgH = maxH;
-        imgW = (canvas.width * imgH) / canvas.height;
+        imgW = imgH / ratio;
       }
 
-      // Centraliza na página
       const x = (pageW - imgW) / 2;
       const y = (pageH - imgH) / 2;
 
-      pdf.addImage(imgData, 'JPEG', x, y, imgW, imgH, undefined, 'FAST');
+      pdf.addImage(imgData, "PNG", x, y, imgW, imgH, undefined, "FAST");
       pdf.save(`ingresso-${ticketId}.pdf`);
 
-      toast({ title: 'Pronto!', description: 'Seu ingresso foi baixado com sucesso.' });
+      toast({ title: "Pronto!", description: "Seu ingresso foi baixado com sucesso." });
     } catch (error) {
-      console.error('Erro ao gerar PDF:', error);
-      toast({ variant: 'destructive', title: 'Erro ao baixar', description: 'Não foi possível gerar o arquivo PDF.' });
+      console.error("Erro ao gerar PDF:", error);
+      toast({ variant: "destructive", title: "Erro ao baixar", description: "Falha ao gerar o arquivo PDF." });
     } finally {
-      element.classList.remove('pdf-mode');
       setDownloadingId(null);
     }
   };
@@ -143,8 +176,9 @@ export default function OrderTicketsPage() {
         <div className="flex flex-wrap gap-12 justify-center">
           {tickets.map((ticket) => (
             <div key={ticket.id} className="flex flex-col gap-6 items-center max-w-[400px] w-full">
-              {/* O Card do Ingresso Vertical Profissional */}
+              {/* Card do Ingresso Vertical Profissional */}
               <Card 
+                data-ticket-id={ticket.id}
                 ref={(el) => { ticketRefs.current[ticket.id] = el; }}
                 className="w-full border-none shadow-[0_30px_60px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col bg-white rounded-[2rem] relative"
               >
@@ -158,8 +192,14 @@ export default function OrderTicketsPage() {
                       unoptimized 
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent flex flex-col justify-end p-8">
-                      <Badge className="bg-primary text-white w-fit mb-3 shadow-lg font-black uppercase text-[10px] tracking-widest border-none">{ticket.ticketName}</Badge>
-                      <h2 className="text-white font-black text-2xl font-headline leading-tight line-clamp-2">{event?.title}</h2>
+                      <Badge 
+                        className="bg-primary text-white w-fit mb-3 shadow-lg font-black uppercase text-[10px] tracking-widest border-none inline-flex items-center justify-center leading-none px-3 h-6"
+                      >
+                        {ticket.ticketName}
+                      </Badge>
+                      <h2 className="text-white font-black text-2xl font-headline leading-[1.2] pb-1 line-clamp-2">
+                        {event?.title}
+                      </h2>
                     </div>
                 </div>
                 
@@ -207,7 +247,7 @@ export default function OrderTicketsPage() {
 
                 {/* Área do QR Code com Fundo Destacado */}
                 <div className="p-10 bg-muted/5 flex flex-col items-center justify-center space-y-6 pt-12">
-                    <div className="bg-white p-5 rounded-3xl shadow-2xl border-4 border-white transform hover:scale-105 transition-transform">
+                    <div className="bg-white p-5 rounded-3xl shadow-2xl border-4 border-white">
                        <Image 
                          src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${ticket.id}`} 
                          alt="QR Code Validação" 
