@@ -16,36 +16,18 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { useToast } from '@/hooks/use-toast';
 
-// Helper para garantir que todas as imagens no elemento foram carregadas e decodificadas
+// Helper para garantir que todas as imagens no elemento foram carregadas
 async function waitForImages(root: HTMLElement) {
   const imgs = Array.from(root.querySelectorAll("img"));
-
   await Promise.all(
-    imgs.map(async (img) => {
-      // espera carregar
-      if (!img.complete) {
-        await new Promise<void>((resolve) => {
-          img.onload = () => resolve();
-          img.onerror = () => resolve();
-        });
-      }
-
-      // espera decodificar (isso evita "linhas cortadas" e falhas de renderização)
-      try {
-        if ('decode' in img) {
-          await (img as any).decode();
-        }
-      } catch (e) {
-        console.warn("Falha ao decodificar imagem para o PDF", e);
-      }
-    })
-  );
-}
-
-// Helper para esperar o próximo frame de renderização
-function nextFrame() {
-  return new Promise<void>((resolve) =>
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    imgs.map((img) =>
+      img.complete
+        ? Promise.resolve()
+        : new Promise<void>((resolve) => {
+            img.onload = () => resolve();
+            img.onerror = () => resolve();
+          })
+    )
   );
 }
 
@@ -98,17 +80,11 @@ export default function OrderTicketsPage() {
     toast({ title: 'Gerando PDF...', description: 'Processando seu ingresso em alta qualidade.' });
 
     try {
-      // 1) Garante fontes e estabilização do layout
-      if (typeof window !== 'undefined' && 'fonts' in document) {
-        await (document as any).fonts.ready;
-      }
-      await nextFrame();
-
-      // 2) Garante imagens carregadas e DECODIFICADAS
+      // Ativa modo PDF para remover sombras e animações que bugam o canvas
+      element.classList.add('pdf-mode');
+      await new Promise((resolve) => setTimeout(resolve, 100));
       await waitForImages(element);
-      await nextFrame();
 
-      // 3) Captura com ajustes finos no clone
       const canvas = await html2canvas(element, {
         scale: 3,
         useCORS: true,
@@ -116,33 +92,10 @@ export default function OrderTicketsPage() {
         backgroundColor: "#ffffff",
         scrollX: 0,
         scrollY: 0,
-        onclone: (doc) => {
-          const cloned = doc.querySelector(`[data-ticket-id="${ticketId}"]`) as HTMLElement | null;
-          if (!cloned) return;
-
-          // Remove animações e efeitos de escala para evitar distorções no PDF
-          cloned.querySelectorAll("*").forEach((el) => {
-            const h = el as HTMLElement;
-            if (h.style) {
-              h.style.animation = "none";
-              h.style.transition = "none";
-              h.style.transform = "none";
-            }
-          });
-
-          // Força uma "zona segura" pro texto do título não cortar
-          const titles = cloned.querySelectorAll("h2");
-          titles.forEach((h2) => {
-            (h2 as HTMLElement).style.lineHeight = "1.2";
-            (h2 as HTMLElement).style.paddingBottom = "4px";
-          });
-        },
       });
 
-      // 4) Converte para JPEG (mais estável para evitar artefatos de "linhas cortadas" no banner)
-      const imgData = canvas.toDataURL("image/jpeg", 0.98);
+      const imgData = canvas.toDataURL("image/png");
 
-      // 5) Configuração do PDF A4
       const pdf = new jsPDF({
         orientation: "portrait",
         unit: "mm",
@@ -151,17 +104,14 @@ export default function OrderTicketsPage() {
 
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
-
-      const margin = 10; // mm
+      const margin = 10;
       const maxW = pageW - margin * 2;
       const maxH = pageH - margin * 2;
 
       const ratio = canvas.height / canvas.width;
-
       let imgW = maxW;
       let imgH = imgW * ratio;
 
-      // Se passar da altura máxima da página, reduz proporcionalmente
       if (imgH > maxH) {
         imgH = maxH;
         imgW = imgH / ratio;
@@ -170,8 +120,7 @@ export default function OrderTicketsPage() {
       const x = (pageW - imgW) / 2;
       const y = (pageH - imgH) / 2;
 
-      // Adiciona a imagem sem o flag "FAST" para evitar baixa qualidade
-      pdf.addImage(imgData, "JPEG", x, y, imgW, imgH);
+      pdf.addImage(imgData, "PNG", x, y, imgW, imgH, undefined, 'FAST');
       pdf.save(`ingresso-${ticketId}.pdf`);
 
       toast({ title: "Pronto!", description: "Seu ingresso foi baixado com sucesso." });
@@ -179,6 +128,7 @@ export default function OrderTicketsPage() {
       console.error("Erro ao gerar PDF:", error);
       toast({ variant: "destructive", title: "Erro ao baixar", description: "Falha ao gerar o arquivo PDF." });
     } finally {
+      element.classList.remove('pdf-mode');
       setDownloadingId(null);
     }
   };
@@ -207,7 +157,6 @@ export default function OrderTicketsPage() {
             <div key={ticket.id} className="flex flex-col gap-6 items-center max-w-[400px] w-full">
               {/* Card do Ingresso Vertical Profissional */}
               <Card 
-                data-ticket-id={ticket.id}
                 ref={(el) => { ticketRefs.current[ticket.id] = el; }}
                 className="w-full border-none shadow-[0_30px_60px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col bg-white rounded-[2rem] relative"
               >
@@ -218,16 +167,12 @@ export default function OrderTicketsPage() {
                       alt="Capa do Evento" 
                       fill 
                       className="object-cover"
-                      unoptimized 
-                      crossOrigin="anonymous"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent flex flex-col justify-end p-8">
-                      <Badge 
-                        className="!bg-primary !text-white !border-none !inline-flex !items-center !justify-center !h-7 !px-4 !py-0 !leading-none shadow-lg font-black uppercase text-[10px] tracking-widest mb-3"
-                      >
-                        <span style={{ lineHeight: "1" }}>{ticket.ticketName}</span>
+                      <Badge className="bg-primary text-white border-none w-fit mb-3 shadow-lg font-black uppercase text-[10px] tracking-widest">
+                        {ticket.ticketName}
                       </Badge>
-                      <h2 className="text-white font-black text-2xl font-headline leading-[1.2] pb-1 line-clamp-2">
+                      <h2 className="text-white font-black text-2xl font-headline leading-tight line-clamp-2">
                         {event?.title}
                       </h2>
                     </div>
@@ -284,8 +229,6 @@ export default function OrderTicketsPage() {
                          width={180}
                          height={180}
                          className="object-contain"
-                         unoptimized
-                         crossOrigin="anonymous"
                        />
                     </div>
                     
