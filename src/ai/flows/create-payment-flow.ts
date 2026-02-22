@@ -30,11 +30,10 @@ const createPaymentFlow = ai.defineFlow(
     inputSchema: CreatePaymentInputSchema,
   },
   async (input) => {
-    // Remove espaços em branco que podem vir de um copiar e colar mal feito
     const accessToken = (process.env.MERCADO_PAGO_ACCESS_TOKEN || '').trim();
 
     if (!accessToken || accessToken === 'SEU_TOKEN_AQUI' || accessToken === '') {
-      throw new Error('TOKEN NÃO ENCONTRADO: Verifique se você colou o seu Access Token no arquivo .env e salvou o arquivo.');
+      throw new Error('CONFIGURAÇÃO NECESSÁRIA: Você precisa colar o seu Access Token no arquivo .env.');
     }
 
     try {
@@ -45,7 +44,6 @@ const createPaymentFlow = ai.defineFlow(
 
       const payment = new Payment(client);
       
-      // Divide o nome para os campos obrigatórios do MP
       const nameParts = input.fullName.trim().split(' ');
       const firstName = nameParts[0] || 'Participante';
       const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Beleza';
@@ -79,9 +77,15 @@ const createPaymentFlow = ai.defineFlow(
     } catch (error: any) {
       console.error('Erro detalhado Mercado Pago:', error);
       
-      // Trata erros específicos de credenciais
-      if (error.message?.includes('access_token')) {
-        throw new Error('Token Inválido: O token configurado no .env não é reconhecido pelo Mercado Pago.');
+      const rawMessage = error.message || '';
+      
+      // Trata o erro de credenciais de produção não ativadas
+      if (rawMessage.includes('Unauthorized use of live credentials')) {
+        throw new Error('ERRO DE CREDENCIAIS: Você está usando um Token de Produção em uma conta que ainda não foi ativada. No painel do Mercado Pago, clique em "Ativar Credenciais" ou use o token da seção "Credenciais de Teste".');
+      }
+
+      if (rawMessage.includes('access_token')) {
+        throw new Error('Token Inválido: O token configurado no .env não é reconhecido ou está expirado.');
       }
 
       const errorMessage = error.cause?.[0]?.description || error.message || 'Erro ao processar PIX.';
