@@ -26,7 +26,8 @@ export async function POST(req: Request) {
     const origin = new URL(req.url).origin;
     const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || origin).replace(/\/$/, '');
 
-    // Divide o nome completo em nome e sobrenome (Exigência do MP)
+    // IMPORTANTE: O Mercado Pago exige Nome (name) e Sobrenome (surname) separados.
+    // Se o usuário digitar apenas um nome, o formulário lá pode travar (botão cinza).
     const nameParts = (buyerName || '').trim().split(/\s+/);
     const firstName = nameParts[0] || 'Participante';
     const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Visitante';

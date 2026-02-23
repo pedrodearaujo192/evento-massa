@@ -82,6 +82,7 @@ export default function CheckoutPage() {
     e.preventDefault();
     setErrorMessage(null);
 
+    // Validação de Nome Completo para evitar botão cinza no Mercado Pago
     const nameParts = formData.fullName.trim().split(/\s+/);
     if (nameParts.length < 2) {
       setErrorMessage('O Mercado Pago exige Nome e Sobrenome (Ex: João Silva).');
