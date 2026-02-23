@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, ArrowLeft, Info, AlertTriangle, CreditCard } from 'lucide-react';
+import { Loader2, ArrowLeft, Info, AlertTriangle, CreditCard, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 
@@ -82,8 +82,9 @@ export default function CheckoutPage() {
     e.preventDefault();
     setErrorMessage(null);
 
-    if (!formData.fullName.trim().includes(' ')) {
-      setErrorMessage('Por favor, insira seu nome completo (Nome e Sobrenome).');
+    const nameParts = formData.fullName.trim().split(/\s+/);
+    if (nameParts.length < 2) {
+      setErrorMessage('O Mercado Pago exige Nome e Sobrenome (Ex: João Silva).');
       return;
     }
 
@@ -196,7 +197,7 @@ export default function CheckoutPage() {
                 <form id="checkout-form" onSubmit={handleFinish} className="space-y-4">
                   <div className="space-y-2">
                     <Label className="font-bold">Nome Completo</Label>
-                    <Input name="fullName" value={formData.fullName} onChange={handleChange} placeholder="Como deve aparecer no ingresso" required className="h-12" />
+                    <Input name="fullName" value={formData.fullName} onChange={handleChange} placeholder="Nome e Sobrenome (Obrigatório)" required className="h-12" />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -215,7 +216,17 @@ export default function CheckoutPage() {
             <Alert className="bg-blue-50 border-blue-200">
               <Info className="h-4 w-4 text-blue-600" />
               <AlertDescription className="text-xs text-blue-700">
-                Você será redirecionado para o Mercado Pago para pagar via <strong>PIX, Cartão ou Boleto</strong> com total segurança.
+                Você será redirecionado para o Mercado Pago com total segurança.
+              </AlertDescription>
+            </Alert>
+
+            <Alert className="bg-amber-50 border-amber-200">
+              <ShieldCheck className="h-4 w-4 text-amber-600" />
+              <AlertTitle className="text-amber-800 font-bold">Dicas para Ambiente de Teste</AlertTitle>
+              <AlertDescription className="text-xs text-amber-700 space-y-2">
+                <p>1. <strong>Use Aba Anônima</strong>: Para evitar conflito com sua conta de vendedor.</p>
+                <p>2. <strong>Nome do Cartão</strong>: Use <strong>APRO</strong> para aprovar o pagamento ou <strong>OTHE</strong> para recusar.</p>
+                <p>3. <strong>E-mail</strong>: Use um e-mail diferente da sua conta principal do Mercado Pago.</p>
               </AlertDescription>
             </Alert>
           </div>
