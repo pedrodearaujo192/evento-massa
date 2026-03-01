@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { 
   doc, 
@@ -162,6 +162,7 @@ export default function ManageEventPage() {
   // States for Event Deleting
   const [isDeleteEventDialogOpen, setIsDeleteEventDialogOpen] = useState(false);
   const [isDeletingEvent, setIsDeletingEvent] = useState(false);
+  const isDeletingRef = useRef(false);
   
   // States for Event Editing
   const [isSavingEdit, setIsSavingEdit] = useState(false);
@@ -176,7 +177,7 @@ export default function ManageEventPage() {
         setEvent({ id: doc.id, ...doc.data() });
       } else {
         // Only redirect if we weren't in the middle of a deletion
-        if (!isDeletingEvent) {
+        if (!isDeletingRef.current) {
           router.push('/dashboard');
         }
       }
@@ -207,8 +208,12 @@ export default function ManageEventPage() {
       }
     );
 
-    return () => { unsubEvent(); unsubTicketTypes(); unsubTickets(); };
-  }, [eventId, user, router, isDeletingEvent]);
+    return () => { 
+      unsubEvent(); 
+      unsubTicketTypes(); 
+      unsubTickets(); 
+    };
+  }, [eventId, user, router]);
 
   const handlePublish = async () => {
     if (ticketTypes.length === 0) {
@@ -242,18 +247,22 @@ export default function ManageEventPage() {
 
   const handleDeleteEvent = async () => {
     setIsDeletingEvent(true);
+    isDeletingRef.current = true;
+    
     try {
-      // 1. Apagar o documento principal
       await deleteDoc(doc(db, 'eventos', eventId as string));
       
-      // Nota: Em uma aplicação real, você também apagaria as subcoleções e ingressos relacionados
-      // Mas para o protótipo, apagar o documento principal já o remove da listagem e acessos.
-
-      toast({ title: 'Evento excluído!', description: 'O evento foi removido permanentemente do banco de dados.' });
-      router.push('/dashboard');
+      toast({ title: 'Evento excluído!', description: 'O evento foi removido permanentemente.' });
+      
+      // Fechar modal explicitamente antes de navegar
+      setIsDeleteEventDialogOpen(false);
+      
+      router.replace('/dashboard');
     } catch (error) {
+      console.error("Erro ao excluir evento:", error);
       toast({ variant: 'destructive', title: 'Erro ao excluir', description: 'Não foi possível remover o evento.' });
       setIsDeletingEvent(false);
+      isDeletingRef.current = false;
     }
   };
 

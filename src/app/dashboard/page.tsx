@@ -161,6 +161,7 @@ export default function DashboardPage() {
                         <DropdownMenuItem 
                           className="cursor-pointer text-destructive focus:text-white focus:bg-destructive"
                           onClick={() => {
+                            setMenuOpenId(null); // Fechar menu antes de abrir diálogo
                             setEventToDelete(event);
                             setIsDeleteDialogOpen(true);
                           }}
@@ -220,7 +221,7 @@ export default function DashboardPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setEventToDelete(null)}>Cancelar</AlertDialogCancel>
             <AlertDialogAction 
               onClick={(e) => {
                 e.preventDefault();
