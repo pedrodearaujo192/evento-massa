@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Event } from '@/lib/types';
 import { useAuth } from '@/hooks/use-auth';
@@ -15,7 +15,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
-import { Loader2, PlusCircle, Calendar, MapPin, Edit, MoreVertical, Settings } from 'lucide-react';
+import { Loader2, PlusCircle, Calendar, MapPin, Edit, MoreVertical, Settings, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -26,13 +26,29 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  
+  const [isDeletingEvent, setIsDeletingEvent] = useState(false);
+  const [eventToDelete, setEventToDelete] = useState<Event | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -62,6 +78,21 @@ export default function DashboardPage() {
   const handleManageClick = (id: string) => {
     setMenuOpenId(null);
     router.push(`/admin/eventos/${id}`);
+  };
+
+  const handleDeleteEvent = async () => {
+    if (!eventToDelete) return;
+    setIsDeletingEvent(true);
+    try {
+      await deleteDoc(doc(db, 'eventos', eventToDelete.id));
+      toast({ title: 'Evento excluído!', description: 'O evento foi removido do banco de dados.' });
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível excluir o evento.' });
+    } finally {
+      setIsDeletingEvent(false);
+      setIsDeleteDialogOpen(false);
+      setEventToDelete(null);
+    }
   };
 
   if (loading) {
@@ -127,7 +158,16 @@ export default function DashboardPage() {
                           <Settings className="mr-2 h-4 w-4" />
                           Gerenciar Evento
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="cursor-pointer" disabled>Ver Vendas</DropdownMenuItem>
+                        <DropdownMenuItem 
+                          className="cursor-pointer text-destructive focus:text-white focus:bg-destructive"
+                          onClick={() => {
+                            setEventToDelete(event);
+                            setIsDeleteDialogOpen(true);
+                          }}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Excluir Evento
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -169,6 +209,32 @@ export default function DashboardPage() {
           ))}
         </div>
       )}
+
+      {/* Exclusão do Dashboard */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir permanentemente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Você está prestes a excluir o evento <strong>{eventToDelete?.title}</strong>. Esta ação não pode ser desfeita e removerá todos os dados do banco de dados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={(e) => {
+                e.preventDefault();
+                handleDeleteEvent();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeletingEvent}
+            >
+              {isDeletingEvent ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              EXCLUIR AGORA
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

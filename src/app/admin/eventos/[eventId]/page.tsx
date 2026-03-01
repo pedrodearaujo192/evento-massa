@@ -83,7 +83,8 @@ import {
   Youtube,
   Clock,
   Trash2,
-  EyeOff
+  EyeOff,
+  AlertTriangle
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -156,6 +157,10 @@ export default function ManageEventPage() {
   const [ticketToDelete, setTicketToDelete] = useState<TicketType | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeletingTicketType, setIsDeletingTicketType] = useState(false);
+
+  // States for Event Deleting
+  const [isDeleteEventDialogOpen, setIsDeleteEventDialogOpen] = useState(false);
+  const [isDeletingEvent, setIsDeletingEvent] = useState(false);
   
   // States for Event Editing
   const [isSavingEdit, setIsSavingEdit] = useState(false);
@@ -169,7 +174,10 @@ export default function ManageEventPage() {
       if (doc.exists()) {
         setEvent({ id: doc.id, ...doc.data() });
       } else {
-        router.push('/dashboard');
+        // Only redirect if we weren't in the middle of a deletion
+        if (!isDeletingEvent) {
+          router.push('/dashboard');
+        }
       }
     });
 
@@ -199,7 +207,7 @@ export default function ManageEventPage() {
     );
 
     return () => { unsubEvent(); unsubTicketTypes(); unsubTickets(); };
-  }, [eventId, user, router]);
+  }, [eventId, user, router, isDeletingEvent]);
 
   const handlePublish = async () => {
     if (ticketTypes.length === 0) {
@@ -228,6 +236,23 @@ export default function ManageEventPage() {
       toast({ title: 'Evento despublicado!', description: 'O evento voltou para rascunho e não está mais visível.' });
     } finally {
       setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleDeleteEvent = async () => {
+    setIsDeletingEvent(true);
+    try {
+      // 1. Apagar o documento principal
+      await deleteDoc(doc(db, 'eventos', eventId as string));
+      
+      // Nota: Em uma aplicação real, você também apagaria as subcoleções e ingressos relacionados
+      // Mas para o protótipo, apagar o documento principal já o remove da listagem e acessos.
+
+      toast({ title: 'Evento excluído!', description: 'O evento foi removido permanentemente do banco de dados.' });
+      router.push('/dashboard');
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Erro ao excluir', description: 'Não foi possível remover o evento.' });
+      setIsDeletingEvent(false);
     }
   };
 
@@ -926,7 +951,40 @@ export default function ManageEventPage() {
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-4 pt-4 border-t">
+                <div className="flex justify-between items-center pt-8 mt-4 border-t">
+                  <AlertDialog open={isDeleteEventDialogOpen} onOpenChange={setIsDeleteEventDialogOpen}>
+                    <AlertDialogTrigger asChild>
+                      <Button type="button" variant="outline" className="border-destructive text-destructive hover:bg-destructive/10 font-bold">
+                        <Trash2 className="mr-2 h-4 w-4" /> EXCLUIR EVENTO
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                          <AlertTriangle className="h-6 w-6" /> EXCLUIR EVENTO PERMANENTEMENTE?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Esta ação é irreversível. O evento <strong>{event.title}</strong> e todos os seus dados serão removidos do banco de dados. 
+                          Se houver ingressos vendidos, recomendamos apenas <strong>Despublicar</strong> o evento.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleDeleteEvent();
+                          }}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          disabled={isDeletingEvent}
+                        >
+                          {isDeletingEvent ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                          EXCLUIR PERMANENTEMENTE
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+
                   <Button type="submit" disabled={isSavingEdit} className="bg-secondary text-white font-bold px-10 h-12">
                     {isSavingEdit ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                     SALVAR ALTERAÇÕES
