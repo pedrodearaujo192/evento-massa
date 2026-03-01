@@ -82,7 +82,8 @@ import {
   Tag,
   Youtube,
   Clock,
-  Trash2
+  Trash2,
+  EyeOff
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -212,6 +213,19 @@ export default function ManageEventPage() {
         updatedAt: serverTimestamp() 
       });
       toast({ title: 'Evento publicado!', description: 'O evento agora está visível para o público.' });
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleUnpublish = async () => {
+    setIsUpdatingStatus(true);
+    try {
+      await updateDoc(doc(db, 'eventos', eventId as string), { 
+        status: 'draft',
+        updatedAt: serverTimestamp() 
+      });
+      toast({ title: 'Evento despublicado!', description: 'O evento voltou para rascunho e não está mais visível.' });
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -471,9 +485,13 @@ export default function ManageEventPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {event.status === 'draft' && (
+          {event.status === 'draft' ? (
             <Button className="bg-primary hover:bg-primary/90 text-white font-bold px-8" onClick={handlePublish} disabled={isUpdatingStatus}>
               {isUpdatingStatus ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'PUBLICAR EVENTO'}
+            </Button>
+          ) : (
+            <Button variant="outline" className="border-destructive text-destructive hover:bg-destructive/10 font-bold px-8" onClick={handleUnpublish} disabled={isUpdatingStatus}>
+              {isUpdatingStatus ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <><EyeOff className="mr-2 h-4 w-4" /> DESPUBLICAR EVENTO</>}
             </Button>
           )}
           <Dialog open={isGuestModalOpen} onOpenChange={setIsGuestModalOpen}>
