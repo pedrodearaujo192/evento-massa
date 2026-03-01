@@ -1,7 +1,6 @@
-
 'use client';
 
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
@@ -30,7 +29,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Icons } from './icons';
-import { Home, LogOut, Settings, User as UserIcon } from 'lucide-react';
+import { Home, LogOut, User as UserIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 type NavItem = {
@@ -52,6 +51,14 @@ export function DashboardLayout({ children, navItems, allowedRoles }: DashboardL
   const pathname = usePathname();
   const { toast } = useToast();
 
+  const isAuthorized = user && userData && allowedRoles.includes(userData.tipo as any);
+
+  useEffect(() => {
+    if (!loading && !isAuthorized) {
+      router.replace('/login');
+    }
+  }, [loading, isAuthorized, router]);
+
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -62,14 +69,7 @@ export function DashboardLayout({ children, navItems, allowedRoles }: DashboardL
     }
   };
   
-  if (loading) {
-    return null;
-  }
-
-  if (!user || !userData || !allowedRoles.includes(userData.tipo as any)) {
-    if (typeof window !== 'undefined' && !loading) {
-        router.replace('/login');
-    }
+  if (loading || !isAuthorized) {
     return null;
   }
 
@@ -78,7 +78,8 @@ export function DashboardLayout({ children, navItems, allowedRoles }: DashboardL
       .split(' ')
       .map((n) => n[0])
       .slice(0, 2)
-      .join('');
+      .join('')
+      .toUpperCase();
   };
 
   return (
@@ -127,9 +128,9 @@ export function DashboardLayout({ children, navItems, allowedRoles }: DashboardL
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                 <Avatar className="h-9 w-9">
-                  <AvatarImage src={`https://picsum.photos/seed/${user.uid}/100/100`} data-ai-hint="person portrait" />
+                  <AvatarImage src={`https://picsum.photos/seed/${user?.uid}/100/100`} />
                   <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
-                    {userData?.nome ? getInitials(userData.nome) : ''}
+                    {userData?.nome ? getInitials(userData.nome) : '??'}
                   </AvatarFallback>
                 </Avatar>
               </Button>

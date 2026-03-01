@@ -1,9 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
-import { Loader2, Calendar, User, PlusCircle, LayoutDashboard } from 'lucide-react';
+import { Loader2, Calendar, User, PlusCircle } from 'lucide-react';
 import { DashboardLayout } from '@/components/dashboard-layout';
 
 const navItems = [
@@ -16,20 +16,25 @@ export default function EventAdminLayout({ children }: { children: React.ReactNo
   const { user, userData, loading } = useAuth();
   const router = useRouter();
 
-  if (loading) {
+  const isAuthorized = user && (userData?.tipo === 'adm_evento' || userData?.tipo === 'super_adm');
+
+  useEffect(() => {
+    if (!loading && !isAuthorized) {
+      router.replace('/login');
+    }
+  }, [loading, isAuthorized, router]);
+
+  if (loading || !isAuthorized) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
-
-  if (!user || (userData?.tipo !== 'adm_evento' && userData?.tipo !== 'super_adm')) {
-    if (typeof window !== 'undefined') {
-        router.replace('/login');
-    }
-    return null;
-  }
   
-  return <DashboardLayout navItems={navItems} allowedRoles={['adm_evento', 'super_adm']}>{children}</DashboardLayout>;
+  return (
+    <DashboardLayout navItems={navItems} allowedRoles={['adm_evento', 'super_adm']}>
+      {children}
+    </DashboardLayout>
+  );
 }
