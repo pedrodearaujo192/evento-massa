@@ -20,4 +20,7 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 
-export const analytics = isSupported().then(yes => yes ? getAnalytics(app) : null);
+// Proteção contra SSR (Server Side Rendering)
+export const analytics = typeof window !== 'undefined' 
+  ? isSupported().then(yes => yes ? getAnalytics(app) : null)
+  : Promise.resolve(null);

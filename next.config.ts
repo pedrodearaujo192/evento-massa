@@ -1,8 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // output: 'standalone' é recomendado para App Hosting e ambientes serverless
+  // standalone é obrigatório para App Hosting
   output: 'standalone',
+
+  // Garante que o SDK do Mercado Pago seja processado corretamente pelo servidor
+  transpilePackages: ['mercadopago'],
 
   images: {
     unoptimized: true,
@@ -18,7 +21,6 @@ const nextConfig: NextConfig = {
   },
 
   trailingSlash: true,
-
   typescript: { ignoreBuildErrors: true },
   eslint: { ignoreDuringBuilds: true },
 };
