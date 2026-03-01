@@ -12,7 +12,8 @@ import {
   Timestamp,
   where,
   writeBatch,
-  addDoc
+  addDoc,
+  deleteDoc
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
@@ -48,6 +49,16 @@ import {
   DialogTrigger,
   DialogFooter
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { 
   Loader2, 
   Plus, 
@@ -70,7 +81,8 @@ import {
   PlusCircle,
   Tag,
   Youtube,
-  Clock
+  Clock,
+  Trash2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -138,6 +150,11 @@ export default function ManageEventPage() {
   const [editingTicketType, setEditingTicketType] = useState<TicketType | null>(null);
   const [isEditTicketModalOpen, setIsEditTicketModalOpen] = useState(false);
   const [isUpdatingTicketType, setIsUpdatingTicketType] = useState(false);
+
+  // States for Ticket Type Deleting
+  const [ticketToDelete, setTicketToDelete] = useState<TicketType | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeletingTicketType, setIsDeletingTicketType] = useState(false);
   
   // States for Event Editing
   const [isSavingEdit, setIsSavingEdit] = useState(false);
@@ -257,6 +274,32 @@ export default function ManageEventPage() {
       toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível atualizar o lote.' });
     } finally {
       setIsUpdatingTicketType(false);
+    }
+  };
+
+  const handleDeleteTicketType = async () => {
+    if (!ticketToDelete) return;
+    
+    if (ticketToDelete.soldCount > 0) {
+      toast({ 
+        variant: 'destructive', 
+        title: 'Não é possível excluir', 
+        description: 'Este lote já possui ingressos vendidos e não pode ser removido.' 
+      });
+      setIsDeleteDialogOpen(false);
+      return;
+    }
+
+    setIsDeletingTicketType(true);
+    try {
+      await deleteDoc(doc(db, 'eventos', eventId as string, 'ticketTypes', ticketToDelete.id));
+      toast({ title: 'Lote excluído', description: 'O lote foi removido com sucesso.' });
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível excluir o lote.' });
+    } finally {
+      setIsDeletingTicketType(false);
+      setIsDeleteDialogOpen(false);
+      setTicketToDelete(null);
     }
   };
 
@@ -683,7 +726,7 @@ export default function ManageEventPage() {
                     <TableHead>Capacidade</TableHead>
                     <TableHead>Vendas</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Ação</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -699,7 +742,20 @@ export default function ManageEventPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => handleOpenEditTicket(t)}><Edit className="h-4 w-4" /></Button>
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="icon" onClick={() => handleOpenEditTicket(t)}><Edit className="h-4 w-4" /></Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => {
+                              setTicketToDelete(t);
+                              setIsDeleteDialogOpen(true);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -922,6 +978,33 @@ export default function ManageEventPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Ticket Confirmation */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. O lote <strong>{ticketToDelete?.name}</strong> será excluído permanentemente. 
+              Lotes com vendas realizadas não podem ser excluídos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={(e) => {
+                e.preventDefault();
+                handleDeleteTicketType();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeletingTicketType}
+            >
+              {isDeletingTicketType ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              EXCLUIR AGORA
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
