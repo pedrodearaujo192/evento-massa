@@ -4,11 +4,13 @@ import MercadoPagoConfig, { Preference } from 'mercadopago';
 
 export async function POST(req: Request) {
   try {
-    const token = (process.env.MERCADOPAGO_ACCESS_TOKEN || process.env.MERCADO_PAGO_ACCESS_TOKEN || '').trim();
+    // Busca o token tentando as duas variações comuns de nome de variável
+    const token = (process.env.MERCADO_PAGO_ACCESS_TOKEN || process.env.MERCADOPAGO_ACCESS_TOKEN || '').trim();
 
-    if (!token || token === 'SEU_TOKEN_AQUI') {
+    if (!token || token === 'SEU_TOKEN_AQUI' || token === '') {
+      console.error('[Mercado Pago] Token não encontrado no ambiente.');
       return NextResponse.json(
-        { error: 'Token do Mercado Pago não configurado no arquivo .env' },
+        { error: 'Configuração pendente: Adicione o MERCADO_PAGO_ACCESS_TOKEN no painel do App Hosting.' },
         { status: 500 }
       );
     }
@@ -27,7 +29,7 @@ export async function POST(req: Request) {
     const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || origin).replace(/\/$/, '');
 
     // IMPORTANTE: O Mercado Pago exige Nome (name) e Sobrenome (surname) separados.
-    // Se o usuário digitar apenas um nome, o formulário lá pode travar (botão cinza).
+    // Se o usuário digitar apenas um nome, o formulário lá pode travar.
     const nameParts = (buyerName || '').trim().split(/\s+/);
     const firstName = nameParts[0] || 'Participante';
     const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Visitante';
@@ -58,6 +60,8 @@ export async function POST(req: Request) {
         excluded_payment_types: [],
         installments: 12,
       },
+      // Expira a preferência em 1 hora para evitar lixo
+      expiration_date_to: new Date(Date.now() + 3600000).toISOString(),
     };
 
     const result = await preference.create({ body });
@@ -69,7 +73,14 @@ export async function POST(req: Request) {
     });
   } catch (err: any) {
     console.error('[Mercado Pago] Erro ao criar preferência:', err);
-    const mpErrorMessage = err.cause?.[0]?.description || err.message || 'Erro ao processar checkout.';
-    return NextResponse.json({ error: `Erro Mercado Pago: ${mpErrorMessage}` }, { status: 500 });
+    
+    // Tenta extrair a mensagem de erro da causa da API do Mercado Pago
+    const apiError = err.cause?.[0];
+    const mpErrorMessage = apiError?.description || err.message || 'Erro ao processar checkout.';
+    
+    return NextResponse.json({ 
+      error: `Mercado Pago: ${mpErrorMessage}`,
+      detail: apiError?.code || 'unknown_error'
+    }, { status: 500 });
   }
 }

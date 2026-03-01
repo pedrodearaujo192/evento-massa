@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -10,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, ArrowLeft, Info, AlertTriangle, CreditCard, ShieldCheck, Mail } from 'lucide-react';
+import { Loader2, ArrowLeft, Info, AlertTriangle, CreditCard, ShieldCheck, Mail, InfoIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 
@@ -64,7 +65,7 @@ export default function CheckoutPage() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     
-    // Se for o campo documento, removemos qualquer caractere que não seja número
+    // Filtro para CPF/CNPJ: apenas números
     const finalValue = name === 'document' ? value.replace(/\D/g, '') : value;
     
     setFormData(prev => ({
@@ -79,16 +80,16 @@ export default function CheckoutPage() {
     e.preventDefault();
     setErrorMessage(null);
 
-    // Validação de Nome Completo
+    // Validação de Nome Completo (Requisito MP para Checkout Pro)
     const nameParts = formData.fullName.trim().split(/\s+/);
     if (nameParts.length < 2) {
-      setErrorMessage('O Mercado Pago exige Nome e Sobrenome (Ex: João Silva).');
+      setErrorMessage('O Mercado Pago exige Nome e Sobrenome para processar o pagamento.');
       return;
     }
 
     // Validação de CPF/CNPJ
     if (formData.document.length < 11) {
-      setErrorMessage('O CPF/CNPJ deve conter apenas números e ter no mínimo 11 dígitos.');
+      setErrorMessage('O CPF/CNPJ deve conter apenas números (mínimo 11 dígitos).');
       return;
     }
 
@@ -103,7 +104,6 @@ export default function CheckoutPage() {
       const batch = writeBatch(db);
       const orderRef = doc(collection(db, 'pedidos'));
       
-      // Removemos confirmEmail antes de salvar no banco
       const { confirmEmail, ...customerData } = formData;
 
       const orderData = {
@@ -161,8 +161,12 @@ export default function CheckoutPage() {
         }
 
         const paymentUrl = data.sandbox_init_point || data.init_point;
+        
+        // Limpa o carrinho local
         localStorage.removeItem('checkout_items');
         localStorage.removeItem('checkout_total');
+        
+        // Redireciona para o Mercado Pago
         window.location.href = paymentUrl;
       } else {
         localStorage.removeItem('checkout_items');
@@ -172,7 +176,7 @@ export default function CheckoutPage() {
       
     } catch (e: any) {
       console.error('Erro no checkout:', e);
-      setErrorMessage(e.message || 'Erro ao processar pagamento. Tente novamente.');
+      setErrorMessage(e.message || 'Erro ao processar pagamento. Verifique se o e-mail não é o mesmo da conta vendedora.');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       setIsSubmitting(false);
     }
@@ -188,6 +192,20 @@ export default function CheckoutPage() {
            <Button variant="ghost" size="icon" onClick={() => router.back()}><ArrowLeft className="h-5 w-5" /></Button>
            <h1 className="text-3xl font-black font-headline tracking-tight">Finalizar Compra</h1>
         </div>
+
+        {/* Alerta de Instrução para Testes (Mercado Pago) */}
+        <Alert className="mb-8 border-amber-500 bg-amber-50 text-amber-900">
+          <InfoIcon className="h-5 w-5 text-amber-600" />
+          <AlertTitle className="font-bold">Dica para Testes</AlertTitle>
+          <AlertDescription className="text-sm">
+            Para evitar erros de <strong>"Saldo Insuficiente"</strong> ou travamentos:
+            <ul className="list-disc ml-5 mt-2">
+              <li>Use uma <strong>Aba Anônima</strong>.</li>
+              <li>Não use o mesmo e-mail que você usa para acessar sua conta de vendedor do Mercado Pago.</li>
+              <li>O sistema aceitará PIX e Cartão normalmente.</li>
+            </ul>
+          </AlertDescription>
+        </Alert>
 
         {errorMessage && (
           <Alert variant="destructive" className="mb-8 bg-destructive/10 text-destructive border-destructive/20">
@@ -223,7 +241,6 @@ export default function CheckoutPage() {
                       required 
                       className="h-12"
                       inputMode="numeric"
-                      pattern="[0-9]*"
                     />
                   </div>
 
@@ -242,9 +259,9 @@ export default function CheckoutPage() {
             </Card>
 
             <Alert className="bg-blue-50 border-blue-200">
-              <Info className="h-4 w-4 text-blue-600" />
+              <ShieldCheck className="h-4 w-4 text-blue-600" />
               <AlertDescription className="text-xs text-blue-700">
-                Você será redirecionado para o Mercado Pago com total segurança.
+                Pagamento processado com total segurança via Mercado Pago.
               </AlertDescription>
             </Alert>
           </div>
