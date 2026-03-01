@@ -1,6 +1,7 @@
-
 import { NextResponse } from 'next/server';
 import MercadoPagoConfig, { Preference } from 'mercadopago';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
@@ -29,7 +30,6 @@ export async function POST(req: Request) {
     const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || origin).replace(/\/$/, '');
 
     // IMPORTANTE: O Mercado Pago exige Nome (name) e Sobrenome (surname) separados.
-    // Se o usuário digitar apenas um nome, o formulário lá pode travar.
     const nameParts = (buyerName || '').trim().split(/\s+/);
     const firstName = nameParts[0] || 'Participante';
     const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Visitante';
@@ -74,7 +74,6 @@ export async function POST(req: Request) {
   } catch (err: any) {
     console.error('[Mercado Pago] Erro ao criar preferência:', err);
     
-    // Tenta extrair a mensagem de erro da causa da API do Mercado Pago
     const apiError = err.cause?.[0];
     const mpErrorMessage = apiError?.description || err.message || 'Erro ao processar checkout.';
     
