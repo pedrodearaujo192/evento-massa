@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -61,20 +60,17 @@ export default function CheckoutPage() {
     loadEvent();
   }, [eventId, router]);
 
-  const maskDocument = (value: string) => {
-    const clean = value.replace(/\D/g, '');
-    if (clean.length <= 11) {
-      return clean.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4').substring(0, 14);
-    }
-    return clean.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5').substring(0, 18);
-  };
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    
+    // Se for o campo documento, removemos qualquer caractere que não seja número
+    const finalValue = name === 'document' ? value.replace(/\D/g, '') : value;
+    
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'document' ? maskDocument(value) : value
+      [name]: finalValue
     }));
+    
     if (errorMessage) setErrorMessage(null);
   };
 
@@ -89,6 +85,12 @@ export default function CheckoutPage() {
       return;
     }
 
+    // Validação básica de CPF/CNPJ (apenas números)
+    if (formData.document.length < 11) {
+      setErrorMessage('O CPF/CNPJ deve conter apenas números e ter no mínimo 11 dígitos.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const batch = writeBatch(db);
@@ -97,7 +99,7 @@ export default function CheckoutPage() {
       const orderData = {
         eventId,
         userId: user?.uid || 'guest',
-        customer: formData,
+        customer: formData, // formData.document já contém apenas números devido ao handleChange
         items,
         total: total / 100,
         status: total > 0 ? 'pendente' : 'pago',
@@ -202,8 +204,17 @@ export default function CheckoutPage() {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label className="font-bold">CPF</Label>
-                      <Input name="document" value={formData.document} onChange={handleChange} placeholder="000.000.000-00" required className="h-12" />
+                      <Label className="font-bold">CPF/CNPJ (digite apenas números)</Label>
+                      <Input 
+                        name="document" 
+                        value={formData.document} 
+                        onChange={handleChange} 
+                        placeholder="Ex: 00000000000" 
+                        required 
+                        className="h-12"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label className="font-bold">E-mail</Label>
