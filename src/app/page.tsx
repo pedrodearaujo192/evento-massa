@@ -63,7 +63,7 @@ export default function HomePage() {
         <div className="relative z-10 container mx-auto px-4 text-center space-y-8">
           <div className="space-y-4">
             <h1 className="text-5xl md:text-7xl font-bold text-foreground font-headline tracking-tight">
-              Sua beleza em <span className="text-primary">evidência</span>
+              Garanta <span className="text-secondary">seu lugar</span> nos melhores <span className="text-primary">eventos</span>
             </h1>
             <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto font-body">
               Encontre workshops, masterclasses e congressos com os maiores nomes do setor.
