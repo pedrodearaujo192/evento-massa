@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, ArrowLeft, Info, AlertTriangle, CreditCard, ShieldCheck } from 'lucide-react';
+import { Loader2, ArrowLeft, Info, AlertTriangle, CreditCard, ShieldCheck, Mail } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 
@@ -30,6 +30,7 @@ export default function CheckoutPage() {
     fullName: '',
     document: '',
     email: '',
+    confirmEmail: '',
     address: 'Venda Online',
     city: '',
     zip: ''
@@ -78,16 +79,22 @@ export default function CheckoutPage() {
     e.preventDefault();
     setErrorMessage(null);
 
-    // Validação de Nome Completo para evitar botão cinza no Mercado Pago
+    // Validação de Nome Completo
     const nameParts = formData.fullName.trim().split(/\s+/);
     if (nameParts.length < 2) {
       setErrorMessage('O Mercado Pago exige Nome e Sobrenome (Ex: João Silva).');
       return;
     }
 
-    // Validação básica de CPF/CNPJ (apenas números)
+    // Validação de CPF/CNPJ
     if (formData.document.length < 11) {
       setErrorMessage('O CPF/CNPJ deve conter apenas números e ter no mínimo 11 dígitos.');
+      return;
+    }
+
+    // Validação de Confirmação de E-mail
+    if (formData.email.trim().toLowerCase() !== formData.confirmEmail.trim().toLowerCase()) {
+      setErrorMessage('Os e-mails informados não são idênticos. Verifique a digitação.');
       return;
     }
 
@@ -96,10 +103,13 @@ export default function CheckoutPage() {
       const batch = writeBatch(db);
       const orderRef = doc(collection(db, 'pedidos'));
       
+      // Removemos confirmEmail antes de salvar no banco
+      const { confirmEmail, ...customerData } = formData;
+
       const orderData = {
         eventId,
         userId: user?.uid || 'guest',
-        customer: formData, // formData.document já contém apenas números devido ao handleChange
+        customer: customerData,
         items,
         total: total / 100,
         status: total > 0 ? 'pendente' : 'pago',
@@ -197,28 +207,34 @@ export default function CheckoutPage() {
                 <CardDescription>Preencha os dados do participante para gerar os ingressos.</CardDescription>
               </CardHeader>
               <CardContent>
-                <form id="checkout-form" onSubmit={handleFinish} className="space-y-4">
+                <form id="checkout-form" onSubmit={handleFinish} className="space-y-6">
                   <div className="space-y-2">
                     <Label className="font-bold">Nome Completo</Label>
                     <Input name="fullName" value={formData.fullName} onChange={handleChange} placeholder="Nome e Sobrenome (Obrigatório)" required className="h-12" />
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  
+                  <div className="space-y-2">
+                    <Label className="font-bold">CPF/CNPJ (digite apenas números)</Label>
+                    <Input 
+                      name="document" 
+                      value={formData.document} 
+                      onChange={handleChange} 
+                      placeholder="Ex: 00000000000" 
+                      required 
+                      className="h-12"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <Label className="font-bold">CPF/CNPJ (digite apenas números)</Label>
-                      <Input 
-                        name="document" 
-                        value={formData.document} 
-                        onChange={handleChange} 
-                        placeholder="Ex: 00000000000" 
-                        required 
-                        className="h-12"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                      />
+                      <Label className="font-bold flex items-center gap-2"><Mail className="h-4 w-4" /> E-mail</Label>
+                      <Input name="email" type="email" value={formData.email} onChange={handleChange} placeholder="seu@email.com" required className="h-12" />
                     </div>
                     <div className="space-y-2">
-                      <Label className="font-bold">E-mail</Label>
-                      <Input name="email" type="email" value={formData.email} onChange={handleChange} placeholder="seu@email.com" required className="h-12" />
+                      <Label className="font-bold flex items-center gap-2"><Mail className="h-4 w-4" /> Confirmar E-mail</Label>
+                      <Input name="confirmEmail" type="email" value={formData.confirmEmail} onChange={handleChange} placeholder="Repita seu e-mail" required className="h-12" />
                     </div>
                   </div>
                 </form>
@@ -229,16 +245,6 @@ export default function CheckoutPage() {
               <Info className="h-4 w-4 text-blue-600" />
               <AlertDescription className="text-xs text-blue-700">
                 Você será redirecionado para o Mercado Pago com total segurança.
-              </AlertDescription>
-            </Alert>
-
-            <Alert className="bg-amber-50 border-amber-200">
-              <ShieldCheck className="h-4 w-4 text-amber-600" />
-              <AlertTitle className="text-amber-800 font-bold">Dicas para Ambiente de Teste</AlertTitle>
-              <AlertDescription className="text-xs text-amber-700 space-y-2">
-                <p>1. <strong>Use Aba Anônima</strong>: Para evitar conflito com sua conta de vendedor.</p>
-                <p>2. <strong>Nome do Cartão</strong>: Use <strong>APRO</strong> para aprovar o pagamento ou <strong>OTHE</strong> para recusar.</p>
-                <p>3. <strong>E-mail</strong>: Use um e-mail diferente da sua conta principal do Mercado Pago.</p>
               </AlertDescription>
             </Alert>
           </div>
