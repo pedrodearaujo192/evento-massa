@@ -24,6 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -68,7 +69,8 @@ import {
   RotateCcw,
   PlusCircle,
   Tag,
-  Youtube
+  Youtube,
+  Clock
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -131,8 +133,13 @@ export default function ManageEventPage() {
   
   const [isAddingTicketType, setIsAddingTicketType] = useState(false);
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
+
+  // States for Ticket Type Editing
+  const [editingTicketType, setEditingTicketType] = useState<TicketType | null>(null);
+  const [isEditTicketModalOpen, setIsEditTicketModalOpen] = useState(false);
+  const [isUpdatingTicketType, setIsUpdatingTicketType] = useState(false);
   
-  // States for Editing
+  // States for Event Editing
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
   const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
@@ -207,7 +214,7 @@ export default function ManageEventPage() {
         quantity: Number(formData.get('quantity')),
         soldCount: 0,
         active: true,
-        salesStartAt: serverTimestamp(),
+        salesStartAt: formData.get('salesStartAt') ? Timestamp.fromDate(new Date(formData.get('salesStartAt') as string)) : serverTimestamp(),
         salesEndAt: event.endAt || serverTimestamp(),
         createdAt: serverTimestamp()
       });
@@ -217,6 +224,39 @@ export default function ManageEventPage() {
       toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível criar o lote.' });
     } finally {
       setIsAddingTicketType(false);
+    }
+  };
+
+  const handleOpenEditTicket = (t: TicketType) => {
+    setEditingTicketType(t);
+    setIsEditTicketModalOpen(true);
+  };
+
+  const handleUpdateTicketType = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingTicketType) return;
+    setIsUpdatingTicketType(true);
+    const formData = new FormData(e.currentTarget);
+    const isActive = formData.get('active') === 'on';
+    
+    try {
+      await updateDoc(doc(db, 'eventos', eventId as string, 'ticketTypes', editingTicketType.id), {
+        name: formData.get('name'),
+        description: formData.get('description') || '',
+        priceType: formData.get('priceType'),
+        priceCents: formData.get('priceType') === 'free' ? 0 : Math.round(Number(formData.get('price')) * 100),
+        quantity: Number(formData.get('quantity')),
+        active: isActive,
+        salesStartAt: formData.get('salesStartAt') ? Timestamp.fromDate(new Date(formData.get('salesStartAt') as string)) : editingTicketType.salesStartAt,
+        updatedAt: serverTimestamp()
+      });
+      setIsEditTicketModalOpen(false);
+      setEditingTicketType(null);
+      toast({ title: 'Sucesso', description: 'Lote de ingressos atualizado.' });
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível atualizar o lote.' });
+    } finally {
+      setIsUpdatingTicketType(false);
     }
   };
 
@@ -617,6 +657,10 @@ export default function ManageEventPage() {
                       <Input name="quantity" type="number" placeholder="100" required />
                     </div>
                     <div className="space-y-2">
+                      <Label>Data de Início das Vendas (Opcional)</Label>
+                      <Input name="salesStartAt" type="datetime-local" />
+                    </div>
+                    <div className="space-y-2">
                       <Label>Descrição (Opcional)</Label>
                       <Textarea name="description" placeholder="O que este ingresso inclui?" />
                     </div>
@@ -649,9 +693,13 @@ export default function ManageEventPage() {
                       <TableCell>{t.priceType === 'free' ? 'Grátis' : `R$ ${(t.priceCents/100).toFixed(2)}`}</TableCell>
                       <TableCell>{t.quantity}</TableCell>
                       <TableCell>{t.soldCount}</TableCell>
-                      <TableCell><Badge variant={t.active ? 'default' : 'outline'}>{t.active ? 'ATIVO' : 'INATIVO'}</Badge></TableCell>
+                      <TableCell>
+                        <Badge variant={t.active ? 'default' : 'outline'} className={t.active ? 'bg-green-500' : ''}>
+                          {t.active ? 'ATIVO' : 'INATIVO'}
+                        </Badge>
+                      </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon"><Edit className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleOpenEditTicket(t)}><Edit className="h-4 w-4" /></Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -815,6 +863,65 @@ export default function ManageEventPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Edit Ticket Modal */}
+      <Dialog open={isEditTicketModalOpen} onOpenChange={setIsEditTicketModalOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Editar Lote de Ingressos</DialogTitle></DialogHeader>
+          {editingTicketType && (
+            <form onSubmit={handleUpdateTicketType} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Nome do Lote</Label>
+                <Input name="name" defaultValue={editingTicketType.name} required />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Tipo de Preço</Label>
+                  <select name="priceType" defaultValue={editingTicketType.priceType} className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm" required>
+                    <option value="paid">Pago</option>
+                    <option value="free">Grátis</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Preço (R$)</Label>
+                  <Input name="price" type="number" step="0.01" defaultValue={(editingTicketType.priceCents/100)} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Quantidade Disponível</Label>
+                  <Input name="quantity" type="number" defaultValue={editingTicketType.quantity} required />
+                </div>
+                <div className="space-y-2">
+                  <Label>Programar Início (Opcional)</Label>
+                  <Input 
+                    name="salesStartAt" 
+                    type="datetime-local" 
+                    defaultValue={editingTicketType.salesStartAt ? format(editingTicketType.salesStartAt.toDate(), "yyyy-MM-dd'T'HH:mm") : ''} 
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Descrição (Opcional)</Label>
+                <Textarea name="description" defaultValue={editingTicketType.description} />
+              </div>
+              <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                <div className="space-y-0.5">
+                  <Label>Lote Ativo</Label>
+                  <p className="text-xs text-muted-foreground">Define se o lote aparece para compra.</p>
+                </div>
+                <Switch name="active" defaultChecked={editingTicketType.active} />
+              </div>
+              <DialogFooter>
+                <Button type="submit" disabled={isUpdatingTicketType} className="w-full">
+                  {isUpdatingTicketType && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  SALVAR ALTERAÇÕES
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
