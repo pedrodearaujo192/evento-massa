@@ -30,6 +30,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -50,7 +51,10 @@ import {
   MapPin,
   FileText,
   ArrowRight,
-  PlusCircle
+  PlusCircle,
+  Tag,
+  Youtube,
+  Scissors
 } from 'lucide-react';
 import Image from 'next/image';
 
@@ -58,18 +62,34 @@ const eventSchema = z.object({
   title: z.string().min(6, 'Título deve ter pelo menos 6 caracteres.').max(80, 'Título muito longo.'),
   slug: z.string().regex(/^[a-z0-9-]+$/, 'O slug deve conter apenas letras minúsculas, números e hífens.'),
   category: z.string().min(1, 'Selecione uma categoria.'),
+  sector: z.string().min(1, 'Selecione um setor da beleza.'),
+  tags: z.string().optional(),
   startAt: z.string().min(1, 'Data de início é obrigatória.'),
   endAt: z.string().min(1, 'Data de término é obrigatória.'),
   city: z.string().min(1, 'Cidade é obrigatória.'),
   state: z.string().min(1, 'Estado é obrigatório.'),
   address: z.string().min(1, 'Endereço é obrigatório.'),
+  mapUrl: z.string().url('Insira um link válido do Google Maps').or(z.literal('')).optional(),
   capacity: z.coerce.number().int().positive('Capacidade deve ser maior que 0.'),
   description: z.string().min(50, 'A descrição deve ter pelo menos 50 caracteres.'),
+  youtubeUrl: z.string().url('Insira um link válido do YouTube').or(z.literal('')).optional(),
   certEnabled: z.boolean().default(false),
   attendanceMode: z.enum(['STRICT', 'EOD', 'SIMPLE']).default('EOD'),
 });
 
 type EventFormValues = z.infer<typeof eventSchema>;
+
+const SECTORS = [
+  "Barbearia",
+  "Cabelo / Cabeleireiros",
+  "Estética Facial / Corporal",
+  "Maquiagem",
+  "Manicure / Pedicure",
+  "Sobrancelhas / Cílios",
+  "Micropigmentação",
+  "Bem-estar / SPA",
+  "Outros"
+];
 
 const EVENTS_COLLECTION = 'eventos';
 
@@ -91,13 +111,17 @@ export default function NewEventPage() {
       title: '',
       slug: '',
       category: '',
+      sector: '',
+      tags: '',
       startAt: '',
       endAt: '',
       city: '',
       state: '',
       address: '',
+      mapUrl: '',
       capacity: 100,
       description: '',
+      youtubeUrl: '',
       certEnabled: false,
       attendanceMode: 'EOD',
     },
@@ -166,16 +190,22 @@ export default function NewEventPage() {
         }
       }
 
+      const tagsArray = data.tags ? data.tags.split(',').map(tag => tag.trim().toLowerCase()).filter(tag => tag !== '') : [];
+
       const eventData = {
         ownerId: user.uid,
         title: data.title,
         slug: finalSlug,
         category: data.category,
+        sector: data.sector,
+        tags: tagsArray,
         startAt: data.startAt ? Timestamp.fromDate(new Date(data.startAt)) : null,
         endAt: data.endAt ? Timestamp.fromDate(new Date(data.endAt)) : null,
         city: data.city,
         state: data.state,
         address: data.address,
+        mapUrl: data.mapUrl || '',
+        youtubeUrl: data.youtubeUrl || '',
         capacity: data.capacity,
         description: data.description,
         status: 'draft',
@@ -194,7 +224,6 @@ export default function NewEventPage() {
         await updateDoc(doc(db, EVENTS_COLLECTION, eventId), eventData as any);
       }
 
-      // TRATAMENTO DA IMAGEM COM TRATAMENTO DE ERRO CORS
       if (imageFile) {
         try {
           if (oldCoverPath) {
@@ -217,11 +246,11 @@ export default function NewEventPage() {
           });
           setOldCoverPath(coverPath);
         } catch (uploadError: any) {
-          console.error('ERRO NO UPLOAD (Pode ser CORS):', uploadError);
+          console.error('ERRO NO UPLOAD:', uploadError);
           toast({ 
             variant: 'destructive', 
             title: 'Erro no Upload da Imagem', 
-            description: 'A imagem não foi salva devido a um erro de CORS ou permissão. O rascunho do evento foi salvo sem a imagem.' 
+            description: 'A imagem não foi salva. O evento foi salvo sem a imagem.' 
           });
         }
       }
@@ -251,9 +280,9 @@ export default function NewEventPage() {
 
   const nextStep = async () => {
     const fieldsByStep: Record<number, any[]> = {
-      1: ['title', 'slug', 'category'],
-      2: ['startAt', 'endAt', 'city', 'state', 'address', 'capacity'],
-      3: ['description'],
+      1: ['title', 'slug', 'category', 'sector'],
+      2: ['startAt', 'endAt', 'city', 'state', 'address', 'capacity', 'mapUrl'],
+      3: ['description', 'youtubeUrl'],
     };
     const isValid = await form.trigger(fieldsByStep[step] as any);
     if (isValid) setStep(s => s + 1);
@@ -302,7 +331,29 @@ export default function NewEventPage() {
                     <FormItem><FormLabel className="font-bold">Link Amigável (Slug)</FormLabel><FormControl><div className="flex items-center gap-1 bg-muted/50 rounded-lg px-4 border focus-within:ring-2 ring-primary/20"><span className="text-muted-foreground text-sm font-medium">/</span><input {...field} className="bg-transparent h-12 outline-none text-sm w-full font-medium" /></div></FormControl><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name="category" render={({ field }) => (
-                    <FormItem><FormLabel className="font-bold">Categoria</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="h-12"><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="Workshop">Workshop</SelectItem><SelectItem value="Curso">Curso</SelectItem><SelectItem value="Masterclass">Masterclass</SelectItem><SelectItem value="Congresso">Congresso</SelectItem></SelectContent></Select><FormMessage /></FormItem>
+                    <FormItem><FormLabel className="font-bold">Tipo de Evento</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="h-12"><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="Workshop">Workshop</SelectItem><SelectItem value="Curso">Curso</SelectItem><SelectItem value="Masterclass">Masterclass</SelectItem><SelectItem value="Congresso">Congresso</SelectItem></SelectContent></Select><FormMessage /></FormItem>
+                  )} />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <FormField control={form.control} name="sector" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="font-bold flex items-center gap-2"><Scissors className="h-4 w-4 text-primary" /> Setor da Beleza</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl><SelectTrigger className="h-12"><SelectValue placeholder="Selecione o setor..." /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          {SECTORS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="tags" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="font-bold flex items-center gap-2"><Tag className="h-4 w-4 text-primary" /> Tags (SEO)</FormLabel>
+                      <FormControl><Input placeholder="Ex: barbearia, degradê, tesoura" {...field} className="h-12" /></FormControl>
+                      <FormDescription>Separe por vírgulas para ajudar na busca.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
                   )} />
                 </div>
               </CardContent>
@@ -335,6 +386,14 @@ export default function NewEventPage() {
                 <FormField control={form.control} name="address" render={({ field }) => (
                   <FormItem><FormLabel className="font-bold">Endereço do Local</FormLabel><FormControl><Input placeholder="Ex: Av. Paulista, 1000 - Bela Vista" {...field} className="h-12" /></FormControl><FormMessage /></FormItem>
                 )} />
+                <FormField control={form.control} name="mapUrl" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="font-bold">Link do Google Maps</FormLabel>
+                    <FormControl><Input placeholder="https://maps.google.com/..." {...field} className="h-12" /></FormControl>
+                    <FormDescription>Link para que o participante saiba como chegar.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )} />
               </CardContent>
             </Card>
           )}
@@ -364,6 +423,16 @@ export default function NewEventPage() {
                       )}
                     </div>
                   </div>
+
+                  <FormField control={form.control} name="youtubeUrl" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="font-bold flex items-center gap-2"><Youtube className="h-4 w-4 text-red-600" /> Link do Vídeo (YouTube)</FormLabel>
+                      <FormControl><Input placeholder="https://www.youtube.com/watch?v=..." {...field} className="h-12" /></FormControl>
+                      <FormDescription>Um vídeo de apresentação ajuda muito nas vendas.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
                   <FormField control={form.control} name="description" render={({ field }) => (
                     <FormItem><FormLabel className="font-bold">Conteúdo e Programação</FormLabel><FormControl><Textarea placeholder="Descreva o que os participantes aprenderão, cronograma, etc..." className="min-h-[250px] text-lg leading-relaxed rounded-xl" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />

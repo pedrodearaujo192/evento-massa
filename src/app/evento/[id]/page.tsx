@@ -8,7 +8,7 @@ import { Navbar } from '@/components/navbar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Loader2, Calendar, MapPin, Ticket, Info, Minus, Plus } from 'lucide-react';
+import { Loader2, Calendar, MapPin, Ticket, Info, Minus, Plus, ExternalLink, Youtube, Tag } from 'lucide-react';
 import Image from 'next/image';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -75,8 +75,20 @@ export default function EventPublicPage() {
     router.push(`/checkout/${id}`);
   };
 
+  const getYoutubeEmbedUrl = (url?: string) => {
+    if (!url) return null;
+    let videoId = '';
+    if (url.includes('v=')) videoId = url.split('v=')[1].split('&')[0];
+    else if (url.includes('be/')) videoId = url.split('be/')[1].split('?')[0];
+    else if (url.includes('embed/')) videoId = url.split('embed/')[1].split('?')[0];
+    
+    return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+  };
+
   if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
   if (!event) return null;
+
+  const embedUrl = getYoutubeEmbedUrl(event.youtubeUrl);
 
   return (
     <div className="min-h-screen bg-muted/10">
@@ -86,7 +98,10 @@ export default function EventPublicPage() {
         <Image src={event.coverUrl || "https://picsum.photos/seed/1/1200/600"} alt={event.title} fill className="object-cover" />
         <div className="absolute inset-0 bg-black/60 flex items-end">
           <div className="container mx-auto px-4 pb-8">
-             <Badge className="bg-primary text-white mb-4">{event.category}</Badge>
+             <div className="flex items-center gap-2 mb-4">
+                <Badge className="bg-primary text-white">{event.category}</Badge>
+                {event.sector && <Badge variant="secondary" className="bg-white/90">{event.sector}</Badge>}
+             </div>
              <h1 className="text-3xl md:text-5xl font-black text-white font-headline leading-tight">{event.title}</h1>
           </div>
         </div>
@@ -95,23 +110,59 @@ export default function EventPublicPage() {
       <main className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">
+            {embedUrl && (
+              <Card className="border-none shadow-sm overflow-hidden">
+                <CardHeader><CardTitle className="flex items-center gap-2 font-headline text-2xl"><Youtube className="text-red-600 h-6 w-6" /> Vídeo de Apresentação</CardTitle></CardHeader>
+                <CardContent className="p-0 aspect-video">
+                  <iframe 
+                    width="100%" 
+                    height="100%" 
+                    src={embedUrl} 
+                    title="Apresentação do Evento" 
+                    frameBorder="0" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                    allowFullScreen
+                  />
+                </CardContent>
+              </Card>
+            )}
+
             <Card className="border-none shadow-sm">
               <CardHeader><CardTitle className="font-headline text-2xl">Sobre o Evento</CardTitle></CardHeader>
-              <CardContent>
+              <CardContent className="space-y-6">
                 <p className="whitespace-pre-wrap text-muted-foreground leading-relaxed">{event.description}</p>
+                
+                {event.tags && event.tags.length > 0 && (
+                  <div className="pt-4 border-t">
+                    <div className="flex flex-wrap gap-2">
+                       {event.tags.map((tag: string) => (
+                         <span key={tag} className="flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
+                           <Tag className="h-3 w-3" /> {tag}
+                         </span>
+                       ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
             <Card className="border-none shadow-sm">
               <CardHeader><CardTitle className="font-headline text-2xl">Localização</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <MapPin className="h-5 w-5 text-primary mt-1" />
+              <CardContent className="space-y-6">
+                <div className="flex items-start gap-4">
+                  <div className="bg-primary/10 p-3 rounded-full"><MapPin className="h-6 w-6 text-primary" /></div>
                   <div>
-                    <p className="font-bold">{event.address}</p>
+                    <p className="font-bold text-lg">{event.address}</p>
                     <p className="text-muted-foreground">{event.city}, {event.state}</p>
                   </div>
                 </div>
+                {event.mapUrl && (
+                  <Button variant="outline" className="w-full h-12 gap-2 border-primary text-primary hover:bg-primary/5" asChild>
+                    <a href={event.mapUrl} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="h-4 w-4" /> VER NO GOOGLE MAPS
+                    </a>
+                  </Button>
+                )}
               </CardContent>
             </Card>
           </div>

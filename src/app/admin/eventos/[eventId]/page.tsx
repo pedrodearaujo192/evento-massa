@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -67,7 +66,9 @@ import {
   ImageIcon,
   Eye,
   RotateCcw,
-  PlusCircle
+  PlusCircle,
+  Tag,
+  Youtube
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -99,6 +100,18 @@ interface EventTicket {
   checkedInAt: Timestamp | null;
   createdAt: Timestamp;
 }
+
+const SECTORS = [
+  "Barbearia",
+  "Cabelo / Cabeleireiros",
+  "Estética Facial / Corporal",
+  "Maquiagem",
+  "Manicure / Pedicure",
+  "Sobrancelhas / Cílios",
+  "Micropigmentação",
+  "Bem-estar / SPA",
+  "Outros"
+];
 
 export default function ManageEventPage() {
   const { eventId } = useParams();
@@ -271,15 +284,21 @@ export default function ManageEventPage() {
     e.preventDefault();
     setIsSavingEdit(true);
     const formData = new FormData(e.currentTarget);
+    const tagsString = formData.get('tags') as string;
+    const tagsArray = tagsString ? tagsString.split(',').map(tag => tag.trim().toLowerCase()).filter(tag => tag !== '') : [];
     
     try {
       const updateData: any = {
         title: formData.get('title'),
         description: formData.get('description'),
         category: formData.get('category'),
+        sector: formData.get('sector'),
+        tags: tagsArray,
         city: formData.get('city'),
         state: formData.get('state'),
         address: formData.get('address'),
+        mapUrl: formData.get('mapUrl'),
+        youtubeUrl: formData.get('youtubeUrl'),
         capacity: Number(formData.get('capacity')),
         startAt: formData.get('startAt') ? Timestamp.fromDate(new Date(formData.get('startAt') as string)) : event.startAt,
         endAt: formData.get('endAt') ? Timestamp.fromDate(new Date(formData.get('endAt') as string)) : event.endAt,
@@ -361,7 +380,7 @@ export default function ManageEventPage() {
               <Badge variant={event.status === 'published' ? 'default' : 'outline'} className={event.status === 'published' ? 'bg-green-500 hover:bg-green-600' : ''}>
                 {event.status === 'published' ? 'PUBLICADO' : 'RASCUNHO'}
               </Badge>
-              <span className="text-xs text-muted-foreground uppercase tracking-wider">{event.category}</span>
+              <span className="text-xs text-muted-foreground uppercase tracking-wider">{event.category} {event.sector && `• ${event.sector}`}</span>
             </div>
             <h1 className="text-3xl font-black font-headline tracking-tight text-foreground">
                {event.title}
@@ -430,6 +449,7 @@ export default function ManageEventPage() {
                   <div className="flex items-center gap-3 text-sm font-medium"><Calendar className="h-4 w-4 text-primary" /> {event.startAt ? format(event.startAt.toDate(), "dd 'de' MMMM 'às' HH:mm", { locale: ptBR }) : ''}</div>
                   <div className="flex items-center gap-3 text-sm font-medium"><MapPin className="h-4 w-4 text-primary" /> {event.address}, {event.city} - {event.state}</div>
                   <div className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">{event.description}</div>
+                  {event.youtubeUrl && <div className="flex items-center gap-2 text-sm text-red-600 font-bold"><Youtube className="h-4 w-4" /> Vídeo de apresentação configurado</div>}
                 </div>
                 <div className="relative aspect-video rounded-xl overflow-hidden shadow-lg border">
                   <Image src={event.coverUrl || "https://picsum.photos/seed/1/600/400"} alt="Capa" fill className="object-cover" />
@@ -659,19 +679,32 @@ export default function ManageEventPage() {
                       <Label>Título do Evento</Label>
                       <Input name="title" defaultValue={event.title} required />
                     </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Tipo de Evento</Label>
+                        <Select name="category" defaultValue={event.category}>
+                          <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Workshop">Workshop</SelectItem>
+                            <SelectItem value="Curso">Curso</SelectItem>
+                            <SelectItem value="Masterclass">Masterclass</SelectItem>
+                            <SelectItem value="Congresso">Congresso</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Setor da Beleza</Label>
+                        <Select name="sector" defaultValue={event.sector}>
+                          <SelectTrigger><SelectValue placeholder="Selecione o setor..." /></SelectTrigger>
+                          <SelectContent>
+                            {SECTORS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
                     <div className="space-y-2">
-                      <Label>Categoria</Label>
-                      <Select name="category" defaultValue={event.category}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Workshop">Workshop</SelectItem>
-                          <SelectItem value="Curso">Curso</SelectItem>
-                          <SelectItem value="Masterclass">Masterclass</SelectItem>
-                          <SelectItem value="Congresso">Congresso</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Label>Tags (SEO) - Separe por vírgulas</Label>
+                      <Input name="tags" defaultValue={event.tags?.join(', ')} placeholder="Ex: barbearia, degradê, tesoura" />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -737,6 +770,17 @@ export default function ManageEventPage() {
                         </label>
                       )}
                     </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2"><Youtube className="h-4 w-4 text-red-600" /> Link do Vídeo (YouTube)</Label>
+                    <Input name="youtubeUrl" defaultValue={event.youtubeUrl} placeholder="https://www.youtube.com/watch?v=..." />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" /> Link do Google Maps</Label>
+                    <Input name="mapUrl" defaultValue={event.mapUrl} placeholder="https://maps.google.com/..." />
                   </div>
                 </div>
 

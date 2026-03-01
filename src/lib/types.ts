@@ -28,6 +28,7 @@ export interface Event {
   title: string;
   slug: string;
   category: string;
+  sector: string;
   tags: string[];
   startAt: Timestamp;
   endAt: Timestamp;
@@ -35,6 +36,7 @@ export interface Event {
   state: string;
   address: string;
   mapUrl?: string;
+  youtubeUrl?: string;
   capacity: number;
   coverUrl: string;
   description: string;
