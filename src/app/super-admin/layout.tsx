@@ -2,7 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { useRouter } from 'navigation';
+import { useRouter } from 'next/navigation';
 import { Loader2, ShieldCheck, Calendar, PlusCircle, LayoutDashboard, Settings } from 'lucide-react';
 import { DashboardLayout } from '@/components/dashboard-layout';
 
