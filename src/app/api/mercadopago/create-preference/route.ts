@@ -5,7 +5,6 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
-    // Busca o token tentando as duas variações comuns de nome de variável
     const token = (process.env.MERCADO_PAGO_ACCESS_TOKEN || process.env.MERCADOPAGO_ACCESS_TOKEN || '').trim();
 
     if (!token || token === 'SEU_TOKEN_AQUI' || token === '') {
@@ -25,11 +24,9 @@ export async function POST(req: Request) {
     
     const preference = new Preference(client);
 
-    // Detecção da URL base para os retornos
     const origin = new URL(req.url).origin;
     const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || origin).replace(/\/$/, '');
 
-    // IMPORTANTE: O Mercado Pago exige Nome (name) e Sobrenome (surname) separados.
     const nameParts = (buyerName || '').trim().split(/\s+/);
     const firstName = nameParts[0] || 'Participante';
     const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Visitante';
@@ -57,10 +54,9 @@ export async function POST(req: Request) {
       },
       auto_return: 'approved' as const,
       payment_methods: {
-        excluded_payment_types: [],
+        excluded_payment_types: [], // Mantemos vazio para aceitar todas as opções, incluindo PIX
         installments: 12,
       },
-      // Expira a preferência em 1 hora para evitar lixo
       expiration_date_to: new Date(Date.now() + 3600000).toISOString(),
     };
 
