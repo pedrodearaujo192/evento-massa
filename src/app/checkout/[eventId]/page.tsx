@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -63,7 +64,6 @@ export default function CheckoutPage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    // Se for documento, permite apenas números
     const finalValue = name === 'document' ? value.replace(/\D/g, '') : value;
     setFormData(prev => ({ ...prev, [name]: finalValue }));
     if (errorMessage) setErrorMessage(null);
@@ -73,7 +73,6 @@ export default function CheckoutPage() {
     e.preventDefault();
     setErrorMessage(null);
 
-    // Validações básicas
     const nameParts = formData.fullName.trim().split(/\s+/);
     if (nameParts.length < 2) {
       setErrorMessage('O Mercado Pago exige Nome e Sobrenome para processar o pagamento.');
@@ -92,13 +91,16 @@ export default function CheckoutPage() {
 
     setIsSubmitting(true);
     try {
+      const { confirmEmail, ...customerData } = formData;
+      const orderRef = doc(collection(db, 'pedidos'));
+      
       if (total > 0) {
         // Fluxo de pagamento via Mercado Pago
         const res = await fetch('/api/mercadopago/create-preference', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            orderId: `temp-${Date.now()}`,
+            orderId: orderRef.id,
             title: event?.title || 'Ingresso Evento',
             quantity: 1,
             unitPrice: total / 100,
@@ -110,12 +112,8 @@ export default function CheckoutPage() {
         const preference = await res.json();
         if (preference.error) throw new Error(preference.error);
 
-        // Criar pedido no Firestore como pendente antes de redirecionar
-        const batch = writeBatch(db);
-        const orderRef = doc(collection(db, 'pedidos'));
-        const { confirmEmail, ...customerData } = formData;
-
-        batch.set(orderRef, {
+        // Criar pedido no Firestore como pendente
+        await writeBatch(db).set(orderRef, {
           eventId,
           userId: user?.uid || 'guest',
           customer: customerData,
@@ -124,21 +122,15 @@ export default function CheckoutPage() {
           status: 'pendente',
           createdAt: serverTimestamp(),
           paymentPreferenceId: preference.id
-        });
+        }).commit();
 
-        await batch.commit();
-
-        // Limpar carrinho e redirecionar para o Mercado Pago
         localStorage.removeItem('checkout_items');
         localStorage.removeItem('checkout_total');
-        
-        // Redireciona para o checkout oficial do Mercado Pago (com PIX, Cartão, etc)
         window.location.href = preference.init_point;
       } else {
-        // Caso Grátis
+        // Caso Grátis - Cria pedido E ingressos imediatamente
         const batch = writeBatch(db);
-        const orderRef = doc(collection(db, 'pedidos'));
-        const { confirmEmail, ...customerData } = formData;
+        
         batch.set(orderRef, {
           eventId,
           userId: user?.uid || 'guest',
@@ -149,14 +141,37 @@ export default function CheckoutPage() {
           createdAt: serverTimestamp(),
           type: 'free'
         });
+
+        // Criar ingressos individuais
+        for (const item of items) {
+          for (let i = 0; i < item.qty; i++) {
+            const ticketRef = doc(collection(db, 'ingressos'));
+            batch.set(ticketRef, {
+              orderId: orderRef.id,
+              eventId,
+              userId: user?.uid || 'guest',
+              userName: customerData.fullName,
+              userEmail: customerData.email,
+              ticketName: item.name,
+              status: 'ativo',
+              checkedInAt: null,
+              createdAt: serverTimestamp()
+            });
+          }
+          // Incrementar contador de vendas
+          const typeRef = doc(db, 'eventos', eventId as string, 'ticketTypes', item.id);
+          batch.update(typeRef, { soldCount: increment(item.qty) });
+        }
+
         await batch.commit();
+        localStorage.removeItem('checkout_items');
+        localStorage.removeItem('checkout_total');
         router.push(`/pagamento/sucesso?orderId=${orderRef.id}`);
       }
       
     } catch (e: any) {
       console.error('Erro no checkout:', e);
       setErrorMessage(e.message || 'Erro ao processar checkout.');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setIsSubmitting(false);
     }
