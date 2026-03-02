@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -13,7 +14,8 @@ import {
   where,
   writeBatch,
   addDoc,
-  deleteDoc
+  deleteDoc,
+  getDoc
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
@@ -26,6 +28,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Select,
   SelectContent,
@@ -85,13 +88,17 @@ import {
   Clock,
   Trash2,
   EyeOff,
-  AlertTriangle
+  AlertTriangle,
+  QrCode,
+  Camera,
+  XCircle
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Image from 'next/image';
 import Link from 'next/link';
+import jsQR from 'jsqr';
 
 interface TicketType {
   id: string;
@@ -169,6 +176,13 @@ export default function ManageEventPage() {
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
   const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
 
+  // States for QR Scanner
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const scanIntervalRef = useRef<number | null>(null);
+
   useEffect(() => {
     if (!eventId || !user) return;
 
@@ -176,7 +190,6 @@ export default function ManageEventPage() {
       if (doc.exists()) {
         setEvent({ id: doc.id, ...doc.data() });
       } else {
-        // Only redirect if we weren't in the middle of a deletion
         if (!isDeletingRef.current) {
           router.push('/dashboard');
         }
@@ -215,6 +228,109 @@ export default function ManageEventPage() {
     };
   }, [eventId, user, router]);
 
+  // QR Scanner Logic
+  useEffect(() => {
+    if (isScannerOpen) {
+      startCamera();
+    } else {
+      stopCamera();
+    }
+    return () => stopCamera();
+  }, [isScannerOpen]);
+
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' } 
+      });
+      setHasCameraPermission(true);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play();
+          startScanning();
+        };
+      }
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      setHasCameraPermission(false);
+      toast({
+        variant: 'destructive',
+        title: 'Câmera Bloqueada',
+        description: 'Por favor, permita o acesso à câmera nas configurações do navegador.',
+      });
+    }
+  };
+
+  const stopCamera = () => {
+    if (scanIntervalRef.current) {
+      cancelAnimationFrame(scanIntervalRef.current);
+      scanIntervalRef.current = null;
+    }
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+  };
+
+  const startScanning = () => {
+    const scan = () => {
+      if (videoRef.current && canvasRef.current && isScannerOpen) {
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+
+        if (video.readyState === video.HAVE_ENOUGH_DATA && context) {
+          canvas.height = video.videoHeight;
+          canvas.width = video.videoWidth;
+          context.drawImage(video, 0, 0, canvas.width, canvas.height);
+          
+          const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: "dontInvert",
+          });
+
+          if (code) {
+            handleScanResult(code.data);
+            return; // Stop scanning after first detection
+          }
+        }
+      }
+      scanIntervalRef.current = requestAnimationFrame(scan);
+    };
+    scanIntervalRef.current = requestAnimationFrame(scan);
+  };
+
+  const handleScanResult = async (ticketId: string) => {
+    setIsScannerOpen(false); // Close scanner immediately
+    
+    try {
+      const ticketRef = doc(db, 'ingressos', ticketId);
+      const ticketSnap = await getDoc(ticketRef);
+
+      if (!ticketSnap.exists()) {
+        toast({ variant: 'destructive', title: 'Ingresso Inválido', description: 'O código lido não pertence a um ingresso cadastrado.' });
+        return;
+      }
+
+      const ticketData = ticketSnap.data();
+      if (ticketData.eventId !== eventId) {
+        toast({ variant: 'destructive', title: 'Evento Incorreto', description: 'Este ingresso pertence a outro evento.' });
+        return;
+      }
+
+      if (ticketData.status === 'usado') {
+        toast({ variant: 'destructive', title: 'Ingresso já usado', description: `Check-in já realizado em ${format(ticketData.checkedInAt.toDate(), "HH:mm")}.` });
+        return;
+      }
+
+      await handleCheckIn(ticketId);
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Erro na leitura', description: 'Não foi possível validar o ingresso.' });
+    }
+  };
+
   const handlePublish = async () => {
     if (ticketTypes.length === 0) {
       toast({ variant: 'destructive', title: 'Sem ingressos', description: 'Crie pelo menos um tipo de ingresso antes de publicar.' });
@@ -251,12 +367,8 @@ export default function ManageEventPage() {
     
     try {
       await deleteDoc(doc(db, 'eventos', eventId as string));
-      
       toast({ title: 'Evento excluído!', description: 'O evento foi removido permanentemente.' });
-      
-      // Fechar modal explicitamente antes de navegar
       setIsDeleteEventDialogOpen(false);
-      
       router.replace('/dashboard');
     } catch (error) {
       console.error("Erro ao excluir evento:", error);
@@ -656,8 +768,18 @@ export default function ManageEventPage() {
         <TabsContent value="checkin" className="space-y-4">
           <Card className="border-none shadow-sm">
             <CardHeader>
-              <CardTitle>Controle de Entrada</CardTitle>
-              <CardDescription>Busque pelo nome ou código. Use "Estornar" para desfazer entradas erradas.</CardDescription>
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <CardTitle>Controle de Entrada</CardTitle>
+                  <CardDescription>Busque pelo nome ou use o scanner de QR Code.</CardDescription>
+                </div>
+                <Button 
+                  onClick={() => setIsScannerOpen(true)}
+                  className="bg-primary text-white font-bold h-12 px-6"
+                >
+                  <QrCode className="mr-2 h-5 w-5" /> LER QR CODE (SCANNER)
+                </Button>
+              </div>
               <div className="pt-4 flex items-center gap-4">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1006,6 +1128,58 @@ export default function ManageEventPage() {
         </TabsContent>
       </Tabs>
 
+      {/* QR Scanner Dialog */}
+      <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
+        <DialogContent className="max-w-md p-0 overflow-hidden bg-black border-none">
+          <DialogHeader className="p-4 bg-background border-b">
+            <DialogTitle className="flex items-center gap-2">
+              <Camera className="h-5 w-5 text-primary" /> Validar Ingresso
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="relative aspect-square w-full bg-black flex items-center justify-center">
+            <video 
+              ref={videoRef} 
+              className="w-full h-full object-cover" 
+              autoPlay 
+              muted 
+              playsInline 
+            />
+            <canvas ref={canvasRef} className="hidden" />
+            
+            {/* Overlay Visual do Scanner */}
+            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+              <div className="w-64 h-64 border-2 border-primary/50 rounded-2xl relative">
+                <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-lg" />
+                <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primary rounded-tr-lg" />
+                <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-lg" />
+                <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primary rounded-br-lg" />
+                
+                {/* Linha de Scan Animada */}
+                <div className="absolute top-0 left-0 w-full h-1 bg-primary shadow-[0_0_15px_rgba(255,0,127,1)] animate-[scan_2s_linear_infinite]" />
+              </div>
+            </div>
+
+            {hasCameraPermission === false && (
+              <div className="absolute inset-0 flex items-center justify-center bg-background/90 p-8 text-center">
+                <div className="space-y-4">
+                  <XCircle className="h-12 w-12 text-destructive mx-auto" />
+                  <p className="font-bold">Acesso Negado</p>
+                  <p className="text-sm text-muted-foreground">Ative a permissão de câmera para usar o scanner.</p>
+                  <Button onClick={startCamera}>TENTAR NOVAMENTE</Button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="p-4 bg-background border-t">
+            <Button variant="ghost" className="w-full" onClick={() => setIsScannerOpen(false)}>
+              CANCELAR
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Edit Ticket Modal */}
       <Dialog open={isEditTicketModalOpen} onOpenChange={setIsEditTicketModalOpen}>
         <DialogContent>
@@ -1091,6 +1265,13 @@ export default function ManageEventPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <style jsx global>{`
+        @keyframes scan {
+          0% { top: 0; }
+          100% { top: 100%; }
+        }
+      `}</style>
     </div>
   );
 }
