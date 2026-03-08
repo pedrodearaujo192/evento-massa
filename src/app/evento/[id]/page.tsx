@@ -13,7 +13,6 @@ import Image from 'next/image';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
-import { Icons } from '@/components/icons';
 
 export default function EventPublicPage() {
   const { id } = useParams();
@@ -107,7 +106,7 @@ export default function EventPublicPage() {
             priority
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-black/40" />
-          {/* Brilhos decorativos (Efeito da Imagem) */}
+          {/* Brilhos decorativos */}
           <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-[120px] animate-pulse" />
           <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-secondary/10 rounded-full blur-[100px] animate-pulse" />
         </div>
@@ -115,7 +114,7 @@ export default function EventPublicPage() {
         <div className="container mx-auto px-4 relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-end">
             <div className="lg:col-span-8 space-y-8">
-              {/* Badges */}
+              {/* Badge Clean - Sem Logo */}
               <div className="flex flex-wrap gap-3">
                 <div className="inline-flex items-center gap-2 bg-primary px-5 py-2 rounded-full shadow-[0_0_20px_rgba(255,0,127,0.4)]">
                   <span className="text-[10px] font-black tracking-widest uppercase">{event.category}</span>
@@ -155,7 +154,6 @@ export default function EventPublicPage() {
               </div>
             </div>
 
-            {/* Espaço reservado para o card de ingressos (Desktop) */}
             <div className="hidden lg:block lg:col-span-4" />
           </div>
         </div>
@@ -165,7 +163,6 @@ export default function EventPublicPage() {
       <main className="container mx-auto px-4 -mt-20 relative z-20 pb-20">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
           
-          {/* Lado Esquerdo: Vídeo e Descrição */}
           <div className="lg:col-span-8 space-y-12">
             {embedUrl && (
               <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl">
@@ -190,7 +187,6 @@ export default function EventPublicPage() {
               </div>
             )}
 
-            {/* Descrição */}
             <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[2.5rem] p-10 space-y-8 shadow-2xl">
               <div className="flex items-center gap-4 border-b border-white/10 pb-6">
                 <div className="bg-primary p-3 rounded-2xl"><Info className="h-6 w-6 text-white" /></div>
@@ -211,7 +207,6 @@ export default function EventPublicPage() {
               )}
             </div>
 
-            {/* Localização Mapa */}
             <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[2.5rem] p-10 space-y-8 shadow-2xl">
                 <div className="flex items-center justify-between border-b border-white/10 pb-6">
                   <div className="flex items-center gap-4">
@@ -237,20 +232,14 @@ export default function EventPublicPage() {
             </div>
           </div>
 
-          {/* Lado Direito: Card de Ingressos (Sticky) */}
           <div className="lg:col-span-4 lg:-mt-64 relative">
              <div className="sticky top-24 space-y-6">
-                {/* O Card do Layout Referência */}
                 <Card className="bg-white rounded-[3rem] overflow-hidden border-none shadow-[0_50px_100px_rgba(0,0,0,0.5)] transform-gpu relative">
-                  {/* Camadas decorativas atrás do card (Efeito de Profundidade) */}
                   <div className="absolute -bottom-4 -right-4 w-full h-full bg-secondary/20 rounded-[3rem] -z-10 translate-x-2 translate-y-2 blur-md" />
                   <div className="absolute -bottom-8 -right-8 w-full h-full bg-primary/10 rounded-[3rem] -z-20 translate-x-4 translate-y-4 blur-xl" />
 
                   <CardHeader className="bg-white pt-10 pb-6 px-10">
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 bg-primary/5 rounded-2xl flex items-center justify-center">
-                        <Icons.Logo />
-                      </div>
                       <CardTitle className="text-3xl font-black font-headline text-black italic">Ingressos</CardTitle>
                     </div>
                     <div className="h-1 w-20 bg-primary/10 mt-4 rounded-full" />
@@ -309,17 +298,10 @@ export default function EventPublicPage() {
                        >
                          {totalItems === 0 ? 'Selecione um Lote' : 'Comprar agora'}
                        </Button>
-                       
-                       <div className="flex items-center justify-center gap-2 pt-2 opacity-50 grayscale scale-90">
-                          <div className="h-px flex-1 bg-black/10" />
-                          <span className="text-[10px] font-black text-black uppercase tracking-widest">Pagamento Seguro</span>
-                          <div className="h-px flex-1 bg-black/10" />
-                       </div>
                     </div>
                   </CardFooter>
                 </Card>
 
-                {/* Card do Organizador */}
                 <Card className="bg-white/5 backdrop-blur-md border border-white/10 rounded-[2.5rem] p-8 shadow-xl">
                    <CardTitle className="text-sm font-black uppercase tracking-widest text-white/40 mb-6">Organizado por</CardTitle>
                    <div className="flex items-center gap-4">
@@ -327,7 +309,7 @@ export default function EventPublicPage() {
                          <User className="h-8 w-8 text-primary" />
                       </div>
                       <div>
-                        <p className="font-black text-lg text-white">Equipe EventoMassa</p>
+                        <p className="font-black text-lg text-white">Equipe Organizadora</p>
                         <p className="text-xs text-white/40 font-bold uppercase tracking-widest">Suporte Especializado</p>
                       </div>
                    </div>
