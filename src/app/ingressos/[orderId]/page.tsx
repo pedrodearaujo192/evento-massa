@@ -160,9 +160,9 @@ export default function OrderTicketsPage() {
 
       pdf.addImage(imgData, "JPEG", x, y, imgW, imgH);
       
-      // Gera nome amigável para o arquivo
-      const safeUserName = generateSlug(ticketData.userName);
-      const safeTicketName = generateSlug(ticketData.ticketName);
+      // Gera nome amigável para o arquivo EM MAIÚSCULAS
+      const safeUserName = generateSlug(ticketData.userName).toUpperCase();
+      const safeTicketName = generateSlug(ticketData.ticketName).toUpperCase();
       const fileName = `${safeUserName}-${safeTicketName}.pdf`;
       
       pdf.save(fileName);
@@ -186,7 +186,7 @@ export default function OrderTicketsPage() {
            <div className="flex items-center gap-4">
               <Button variant="outline" size="icon" className="rounded-full shadow-sm" onClick={() => router.push('/')}><ArrowLeft className="h-4 w-4" /></Button>
               <div>
-                 <h1 className="text-3xl font-black font-headline tracking-tight text-foreground">Meus Ingressos</h1>
+                 <h1 className="text-3xl font-black font-headline tracking-tight text-foreground uppercase">Meus Ingressos</h1>
                  <p className="text-muted-foreground text-xs uppercase tracking-widest font-bold">PEDIDO: {orderId}</p>
               </div>
            </div>
@@ -198,7 +198,7 @@ export default function OrderTicketsPage() {
         <div className="flex flex-wrap gap-12 justify-center">
           {tickets.map((ticket) => (
             <div key={ticket.id} className="flex flex-col gap-6 items-center max-w-[400px] w-full">
-              {/* Card do Ingresso Vertical Profissional - Layout Novo */}
+              {/* Card do Ingresso Vertical Profissional */}
               <Card 
                 ref={(el) => { ticketRefs.current[ticket.id] = el; }}
                 data-ticket-id={ticket.id}
@@ -217,7 +217,7 @@ export default function OrderTicketsPage() {
                     <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
                 </div>
                 
-                {/* Infos abaixo da imagem (zona segura pro PDF) */}
+                {/* Infos abaixo da imagem */}
                 <div className="px-8 pt-7 pb-6 bg-white text-center">
                   <div className="flex justify-center">
                     <span 
@@ -228,7 +228,7 @@ export default function OrderTicketsPage() {
                     </span>
                   </div>
                   <h2 
-                    className="mt-4 text-2xl font-black font-headline text-foreground leading-tight"
+                    className="mt-4 text-2xl font-black font-headline text-foreground leading-tight uppercase"
                     style={{ paddingBottom: "2px", textRendering: "geometricPrecision" }}
                   >
                     {event?.title}
@@ -258,7 +258,7 @@ export default function OrderTicketsPage() {
 
                     <div className="space-y-1">
                       <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">TITULAR DO INGRESSO</p>
-                      <p className="font-bold flex items-center gap-3 text-base text-foreground bg-muted/20 p-3 rounded-xl border border-muted/50">
+                      <p className="font-bold flex items-center gap-3 text-base text-foreground bg-muted/20 p-3 rounded-xl border border-muted/50 uppercase">
                         <User className="h-5 w-5 text-primary" />
                         {ticket.userName}
                       </p>
@@ -266,7 +266,7 @@ export default function OrderTicketsPage() {
 
                     <div className="space-y-1">
                       <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">LOCALIZAÇÃO</p>
-                      <p className="text-sm font-medium flex items-start gap-2 leading-snug text-muted-foreground">
+                      <p className="text-sm font-medium flex items-start gap-2 leading-snug text-muted-foreground uppercase">
                         <MapPin className="h-4 w-4 text-primary mt-0.5 shrink-0" />
                         <span>{event?.address}, {event?.city} - {event?.state}</span>
                       </p>
