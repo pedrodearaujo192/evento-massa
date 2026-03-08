@@ -86,10 +86,12 @@ export interface Order {
 export interface Ticket {
   id: string;
   eventId: string;
+  ticketTypeId: string;
   orderId: string;
   userId: string;
   userName: string;
-  qrCode: string;
+  userEmail: string;
+  ticketName: string;
   status: 'ativo' | 'usado' | 'cancelado';
   checkedInAt: Timestamp | null;
   createdAt: Timestamp;

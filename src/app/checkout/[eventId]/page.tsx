@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -149,6 +148,7 @@ export default function CheckoutPage() {
             batch.set(ticketRef, {
               orderId: orderRef.id,
               eventId,
+              ticketTypeId: item.id, // Armazenar o ID do lote
               userId: user?.uid || 'guest',
               userName: customerData.fullName,
               userEmail: customerData.email,
@@ -195,14 +195,6 @@ export default function CheckoutPage() {
             <AlertDescription className="text-sm font-medium">{errorMessage}</AlertDescription>
           </Alert>
         )}
-
-        <Alert className="mb-8 border-amber-500 bg-amber-50">
-          <InfoIcon className="h-4 w-4 text-amber-600" />
-          <AlertTitle className="text-amber-800 font-bold">Importante para Testes</AlertTitle>
-          <AlertDescription className="text-amber-700 text-xs">
-            Se estiver em ambiente de teste e vir o erro "Saldo Insuficiente", abra esta página em uma **JANELA ANÔNIMA** e use um **e-mail diferente** da sua conta de vendedor.
-          </AlertDescription>
-        </Alert>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">

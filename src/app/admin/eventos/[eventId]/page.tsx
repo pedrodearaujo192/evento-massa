@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -15,7 +14,8 @@ import {
   writeBatch,
   addDoc,
   deleteDoc,
-  getDoc
+  getDoc,
+  increment
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
@@ -91,7 +91,9 @@ import {
   AlertTriangle,
   QrCode,
   Camera,
-  XCircle
+  XCircle,
+  UserCog,
+  UserX
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -117,6 +119,7 @@ interface EventTicket {
   id: string;
   orderId: string;
   eventId: string;
+  ticketTypeId: string;
   userName: string;
   userEmail: string;
   ticketName: string;
@@ -165,6 +168,15 @@ export default function ManageEventPage() {
   const [ticketToDelete, setTicketToDelete] = useState<TicketType | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeletingTicketType, setIsDeletingTicketType] = useState(false);
+
+  // States for Individual Ticket Management
+  const [editingParticipantTicket, setEditingParticipantTicket] = useState<EventTicket | null>(null);
+  const [isEditParticipantModalOpen, setIsEditParticipantModalOpen] = useState(false);
+  const [isUpdatingParticipant, setIsUpdatingParticipant] = useState(false);
+
+  const [participantTicketToDelete, setParticipantTicketToDelete] = useState<EventTicket | null>(null);
+  const [isDeleteParticipantDialogOpen, setIsDeleteParticipantDialogOpen] = useState(false);
+  const [isDeletingParticipant, setIsDeletingParticipant] = useState(false);
 
   // States for Event Deleting
   const [isDeleteEventDialogOpen, setIsDeleteEventDialogOpen] = useState(false);
@@ -464,6 +476,53 @@ export default function ManageEventPage() {
     }
   };
 
+  const handleUpdateParticipant = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingParticipantTicket) return;
+    setIsUpdatingParticipant(true);
+    const formData = new FormData(e.currentTarget);
+    try {
+      await updateDoc(doc(db, 'ingressos', editingParticipantTicket.id), {
+        userName: formData.get('userName'),
+        userEmail: formData.get('userEmail'),
+        updatedAt: serverTimestamp()
+      });
+      setIsEditParticipantModalOpen(false);
+      toast({ title: 'Sucesso', description: 'Dados do participante atualizados.' });
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível atualizar os dados.' });
+    } finally {
+      setIsUpdatingParticipant(false);
+    }
+  };
+
+  const handleDeleteParticipant = async () => {
+    if (!participantTicketToDelete) return;
+    setIsDeletingParticipant(true);
+    try {
+      const batch = writeBatch(db);
+      
+      // Deletar o ingresso
+      batch.delete(doc(db, 'ingressos', participantTicketToDelete.id));
+      
+      // Decrementar o soldCount do lote se soubermos qual é
+      if (participantTicketToDelete.ticketTypeId) {
+        batch.update(doc(db, 'eventos', eventId as string, 'ticketTypes', participantTicketToDelete.ticketTypeId), {
+          soldCount: increment(-1)
+        });
+      }
+
+      await batch.commit();
+      toast({ title: 'Sucesso', description: 'Ingresso removido e vaga estornada.' });
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível remover o ingresso.' });
+    } finally {
+      setIsDeletingParticipant(false);
+      setIsDeleteParticipantDialogOpen(false);
+      setParticipantTicketToDelete(null);
+    }
+  };
+
   const handleAddGuest = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsAddingGuest(true);
@@ -501,6 +560,7 @@ export default function ManageEventPage() {
       batch.set(ticketRef, {
         orderId: orderRef.id,
         eventId,
+        ticketTypeId,
         userName: formData.get('fullName'),
         userEmail: formData.get('email'),
         ticketName: selectedTicketType?.name || 'Ingresso',
@@ -710,7 +770,7 @@ export default function ManageEventPage() {
           <Card className="border-none shadow-sm">
             <CardHeader>
               <CardTitle>Lista de Participantes</CardTitle>
-              <CardDescription>Visualize todos os inscritos e acesse seus ingressos individuais.</CardDescription>
+              <CardDescription>Visualize todos os inscritos e gerencie seus ingressos individuais.</CardDescription>
               <div className="pt-4 flex items-center gap-4">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -729,7 +789,7 @@ export default function ManageEventPage() {
                   <TableHead>Participante</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Ação</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -748,15 +808,38 @@ export default function ManageEventPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      {t.orderId ? (
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={`/ingressos/${t.orderId}`} target="_blank">
-                            <Eye className="mr-2 h-4 w-4" /> VER INGRESSO
-                          </Link>
+                      <div className="flex justify-end gap-2">
+                        {t.orderId && (
+                          <Button variant="outline" size="icon" asChild title="Ver Ingresso">
+                            <Link href={`/ingressos/${t.orderId}`} target="_blank">
+                              <Eye className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                        )}
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          title="Editar Participante"
+                          onClick={() => {
+                            setEditingParticipantTicket(t);
+                            setIsEditParticipantModalOpen(true);
+                          }}
+                        >
+                          <UserCog className="h-4 w-4" />
                         </Button>
-                      ) : (
-                        <span className="text-xs text-muted-foreground italic">Sem Pedido</span>
-                      )}
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="text-destructive hover:bg-destructive/10"
+                          title="Remover Ingresso"
+                          onClick={() => {
+                            setParticipantTicketToDelete(t);
+                            setIsDeleteParticipantDialogOpen(true);
+                          }}
+                        >
+                          <UserX className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -1239,6 +1322,35 @@ export default function ManageEventPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit Participant Modal */}
+      <Dialog open={isEditParticipantModalOpen} onOpenChange={setIsEditParticipantModalOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Editar Dados do Participante</DialogTitle></DialogHeader>
+          {editingParticipantTicket && (
+            <form onSubmit={handleUpdateParticipant} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Nome do Titular</Label>
+                <Input name="userName" defaultValue={editingParticipantTicket.userName} required />
+              </div>
+              <div className="space-y-2">
+                <Label>E-mail</Label>
+                <Input name="userEmail" type="email" defaultValue={editingParticipantTicket.userEmail} required />
+              </div>
+              <div className="p-4 bg-muted/20 rounded-lg">
+                <p className="text-xs text-muted-foreground">Tipo de Ingresso: <span className="font-bold text-foreground">{editingParticipantTicket.ticketName}</span></p>
+                <p className="text-xs text-muted-foreground">ID do Pedido: <span className="font-mono text-foreground">#{editingParticipantTicket.orderId.slice(-6).toUpperCase()}</span></p>
+              </div>
+              <DialogFooter>
+                <Button type="submit" disabled={isUpdatingParticipant} className="w-full">
+                  {isUpdatingParticipant && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  ATUALIZAR DADOS
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Delete Ticket Confirmation */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
@@ -1261,6 +1373,35 @@ export default function ManageEventPage() {
             >
               {isDeletingTicketType ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
               EXCLUIR AGORA
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Participant Ticket Confirmation */}
+      <AlertDialog open={isDeleteParticipantDialogOpen} onOpenChange={setIsDeleteParticipantDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">Remover Ingresso?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Você está prestes a excluir o ingresso de <strong>{participantTicketToDelete?.userName}</strong>. 
+              Esta ação liberará uma vaga no lote <strong>{participantTicketToDelete?.ticketName}</strong>.
+              <br /><br />
+              <strong>Atenção:</strong> Isso não realiza o estorno financeiro automático no Mercado Pago. O estorno deve ser feito manualmente no painel deles se necessário.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={(e) => {
+                e.preventDefault();
+                handleDeleteParticipant();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeletingParticipant}
+            >
+              {isDeletingParticipant ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserX className="mr-2 h-4 w-4" />}
+              REMOVER DEFINITIVAMENTE
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
