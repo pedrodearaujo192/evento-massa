@@ -15,6 +15,7 @@ import Image from 'next/image';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { useToast } from '@/hooks/use-toast';
+import { generateSlug } from '@/lib/utils';
 
 // Helper para garantir que todas as imagens no elemento foram carregadas e decodificadas
 async function waitForImages(root: HTMLElement) {
@@ -87,7 +88,9 @@ export default function OrderTicketsPage() {
 
   const handleDownloadPDF = async (ticketId: string) => {
     const element = ticketRefs.current[ticketId];
-    if (!element) return;
+    const ticketData = tickets.find(t => t.id === ticketId);
+    
+    if (!element || !ticketData) return;
 
     setDownloadingId(ticketId);
     toast({ title: 'Gerando PDF...', description: 'Processando seu ingresso em alta qualidade.' });
@@ -156,7 +159,13 @@ export default function OrderTicketsPage() {
       const y = (pageH - imgH) / 2;
 
       pdf.addImage(imgData, "JPEG", x, y, imgW, imgH);
-      pdf.save(`ingresso-${ticketId}.pdf`);
+      
+      // Gera nome amigável para o arquivo
+      const safeUserName = generateSlug(ticketData.userName);
+      const safeTicketName = generateSlug(ticketData.ticketName);
+      const fileName = `${safeUserName}-${safeTicketName}.pdf`;
+      
+      pdf.save(fileName);
 
       toast({ title: "Pronto!", description: "Seu ingresso foi baixado com sucesso." });
     } catch (error) {
