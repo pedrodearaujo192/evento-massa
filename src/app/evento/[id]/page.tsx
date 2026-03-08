@@ -118,7 +118,6 @@ export default function EventPublicPage() {
               {/* Badges */}
               <div className="flex flex-wrap gap-3">
                 <div className="inline-flex items-center gap-2 bg-primary px-5 py-2 rounded-full shadow-[0_0_20px_rgba(255,0,127,0.4)]">
-                  <Icons.Logo />
                   <span className="text-[10px] font-black tracking-widest uppercase">{event.category}</span>
                 </div>
                 {event.sector && (
