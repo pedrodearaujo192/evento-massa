@@ -211,7 +211,7 @@ export default function EventPublicPage() {
                 <div className="flex items-center justify-between border-b border-white/10 pb-6">
                   <div className="flex items-center gap-4">
                     <div className="bg-secondary p-3 rounded-2xl"><MapPin className="h-6 w-6 text-white" /></div>
-                    <h2 className="text-2xl font-black font-headline uppercase tracking-tight">Onde nos encontrar</h2>
+                    <h2 className="text-2xl font-black font-headline uppercase tracking-tight">ONDE SERÁ O NOSSO EVENTO</h2>
                   </div>
                 </div>
                 <div className="space-y-6">
