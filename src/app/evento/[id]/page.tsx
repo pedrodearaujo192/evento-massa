@@ -98,12 +98,12 @@ export default function EventPublicPage() {
     <div className={cn("min-h-screen transition-colors duration-500", isDark ? "bg-black text-white" : "bg-white text-black")}>
       <Navbar />
       
-      {/* Seção Principal - Focada na Imagem 1000px */}
+      {/* Seção Principal - Flyer Centralizado 1000px */}
       <main className="container mx-auto px-4 py-8 md:py-12">
         <div className="max-w-[1000px] mx-auto space-y-12">
           
           {/* FLYER DO EVENTO - SEM CORTE E PROPORCIONAL */}
-          <section className="relative w-full rounded-[2.5rem] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.3)] bg-black/5">
+          <section className="relative w-full rounded-[2.5rem] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.3)] bg-black/5 flex justify-center">
              <Image 
                src={event.coverUrl || "https://picsum.photos/seed/event/1000/1200"} 
                alt={event.title} 
@@ -193,7 +193,7 @@ export default function EventPublicPage() {
               <div className={cn("p-10 rounded-[2.5rem] border space-y-6", isDark ? "bg-white/5 border-white/10" : "bg-black/5 border-black/5")}>
                  <div className="flex items-center gap-3">
                     <MapPin className="h-6 w-6" style={{ color: secondary }} />
-                    <h2 className="text-xl font-black font-headline uppercase tracking-tight">Onde será o nosso evento</h2>
+                    <h2 className="text-xl font-black font-headline uppercase tracking-tight">Localização</h2>
                  </div>
                  <div className="space-y-4">
                     <div>
