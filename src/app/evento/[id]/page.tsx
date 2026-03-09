@@ -128,7 +128,7 @@ export default function EventPublicPage() {
               )}
             </div>
 
-            <h1 className={cn("text-4xl md:text-7xl font-black font-headline leading-[1.1] tracking-tight uppercase italic", isDark ? "text-white" : "text-black")}>
+            <h1 className={cn("text-4xl md:text-7xl font-black font-headline leading-[1.1] tracking-tight uppercase", isDark ? "text-white" : "text-black")}>
               {event.title}
             </h1>
 
@@ -164,7 +164,7 @@ export default function EventPublicPage() {
               <div className={cn("p-10 rounded-[2.5rem] border space-y-6", isDark ? "bg-white/5 border-white/10" : "bg-black/5 border-black/5")}>
                  <div className="flex items-center gap-3">
                     <Info className="h-6 w-6" style={{ color: primary }} />
-                    <h2 className="text-xl font-black font-headline uppercase tracking-tight italic">Sobre o Evento</h2>
+                    <h2 className="text-xl font-black font-headline uppercase tracking-tight">Sobre o Evento</h2>
                  </div>
                  <p className={cn("whitespace-pre-wrap leading-relaxed text-lg font-medium", isDark ? "text-white/70" : "text-black/70")}>
                     {event.description}
@@ -193,11 +193,11 @@ export default function EventPublicPage() {
               <div className={cn("p-10 rounded-[2.5rem] border space-y-6", isDark ? "bg-white/5 border-white/10" : "bg-black/5 border-black/5")}>
                  <div className="flex items-center gap-3">
                     <MapPin className="h-6 w-6" style={{ color: secondary }} />
-                    <h2 className="text-xl font-black font-headline uppercase tracking-tight italic">Localização</h2>
+                    <h2 className="text-xl font-black font-headline uppercase tracking-tight">Onde será o nosso evento</h2>
                  </div>
                  <div className="space-y-4">
                     <div>
-                      <p className="font-black text-2xl uppercase italic">{event.address}</p>
+                      <p className="font-black text-2xl uppercase">{event.address}</p>
                       <p className="font-medium opacity-60 uppercase">{event.city}, {event.state}</p>
                     </div>
                     {event.mapUrl && (
@@ -216,7 +216,7 @@ export default function EventPublicPage() {
               <div className="sticky top-28">
                 <Card className="rounded-[3rem] border-none shadow-[0_40px_80px_rgba(0,0,0,0.3)] bg-white overflow-hidden">
                   <CardHeader className="bg-white p-10 pb-6">
-                    <CardTitle className="text-3xl font-black font-headline text-black italic uppercase tracking-tighter">Ingressos</CardTitle>
+                    <CardTitle className="text-3xl font-black font-headline text-black uppercase tracking-tighter">Ingressos</CardTitle>
                     <div className="h-1.5 w-16 rounded-full" style={{ backgroundColor: `${primary}30` }} />
                   </CardHeader>
 
@@ -225,10 +225,10 @@ export default function EventPublicPage() {
                       <div key={ticket.id} className="p-6 rounded-[2rem] border border-black/5 bg-black/[0.02] hover:bg-black/[0.04] transition-colors group">
                         <div className="flex justify-between items-start mb-4">
                           <div className="space-y-1">
-                            <p className="font-black text-black text-lg uppercase italic leading-none">{ticket.name}</p>
+                            <p className="font-black text-black text-lg uppercase leading-none">{ticket.name}</p>
                             <p className="text-[10px] font-bold text-black/40 uppercase tracking-widest">{ticket.description || 'Lote Disponível'}</p>
                           </div>
-                          <p className="text-xl font-black italic" style={{ color: secondary }}>
+                          <p className="text-xl font-black" style={{ color: secondary }}>
                             {ticket.priceType === 'free' ? 'GRÁTIS' : `R$ ${(ticket.priceCents / 100).toFixed(2).replace('.', ',')}`}
                           </p>
                         </div>
@@ -249,13 +249,13 @@ export default function EventPublicPage() {
                     {totalItems > 0 && (
                       <div className="w-full flex justify-between items-center px-6 py-4 rounded-2xl border border-black/5 bg-black/[0.02]">
                         <span className="font-bold text-black/40 text-xs uppercase tracking-widest">SUBTOTAL</span>
-                        <span className="font-black text-2xl text-black italic">R$ {(totalPrice / 100).toFixed(2).replace('.', ',')}</span>
+                        <span className="font-black text-2xl text-black">R$ {(totalPrice / 100).toFixed(2).replace('.', ',')}</span>
                       </div>
                     )}
                     
                     <Button 
                       onClick={handleCheckout} 
-                      className="w-full text-white font-black h-20 text-xl rounded-[2rem] transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 uppercase tracking-widest italic" 
+                      className="w-full text-white font-black h-20 text-xl rounded-[2rem] transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 uppercase tracking-widest" 
                       style={{ backgroundColor: primary, boxShadow: `0 20px 40px ${primary}40` }}
                       disabled={totalItems === 0}
                     >
