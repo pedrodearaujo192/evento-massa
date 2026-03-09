@@ -8,7 +8,7 @@ import { Navbar } from '@/components/navbar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Loader2, Calendar, MapPin, Ticket, Info, Minus, Plus, ExternalLink, Youtube, Tag, User, MapPinned } from 'lucide-react';
+import { Loader2, Calendar, MapPin, Ticket, Info, Minus, Plus, ExternalLink, Youtube, Tag, User, MapPinned, ImageIcon } from 'lucide-react';
 import Image from 'next/image';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -98,25 +98,29 @@ export default function EventPublicPage() {
     <div className={cn("min-h-screen transition-colors duration-500", isDark ? "bg-black text-white" : "bg-white text-black")}>
       <Navbar />
       
-      {/* Hero Section Dynamic */}
-      <section className="relative min-h-[600px] flex items-center pt-10 pb-20 overflow-hidden">
+      {/* Hero Section Dynamic - OTIMIZADA PARA NÃO CORTAR A IMAGEM */}
+      <section className="relative min-h-[500px] lg:min-h-[700px] flex items-center pt-10 pb-20 overflow-hidden">
+        {/* Background Atmosférico (Blur) */}
         <div className="absolute inset-0 z-0">
           <Image 
             src={event.coverUrl || "https://picsum.photos/seed/bg/1920/1080"} 
-            alt={event.title} 
+            alt="" 
             fill 
-            className={cn("object-cover opacity-40", isDark ? "grayscale" : "")}
+            className={cn("object-cover opacity-30 blur-3xl", isDark ? "grayscale" : "")}
             priority
           />
-          <div className={cn("absolute inset-0", isDark ? "bg-gradient-to-t from-black via-black/80 to-black/40" : "bg-gradient-to-t from-white via-white/80 to-white/40")} />
+          <div className={cn("absolute inset-0", isDark ? "bg-black/60" : "bg-white/60")} />
+          
           {/* Dynamic Accents */}
           <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full blur-[120px] animate-pulse opacity-20" style={{ backgroundColor: primary }} />
           <div className="absolute bottom-1/4 right-1/4 w-64 h-64 rounded-full blur-[100px] animate-pulse opacity-10" style={{ backgroundColor: secondary }} />
         </div>
 
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-end">
-            <div className="lg:col-span-8 space-y-8">
+        <div className="container mx-auto px-4 relative z-10 pt-10">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+            
+            {/* Informações à Esquerda */}
+            <div className="lg:col-span-6 space-y-8">
               <div className="flex flex-wrap gap-3">
                 <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full shadow-lg" style={{ backgroundColor: primary }}>
                   <span className="text-[10px] font-black tracking-widest uppercase text-white">{event.category}</span>
@@ -128,7 +132,7 @@ export default function EventPublicPage() {
                 )}
               </div>
 
-              <h1 className={cn("text-4xl md:text-7xl font-black font-headline leading-[1.1] tracking-tight uppercase drop-shadow-2xl", isDark ? "text-white" : "text-black")}>
+              <h1 className={cn("text-4xl md:text-6xl font-black font-headline leading-[1.1] tracking-tight uppercase drop-shadow-2xl", isDark ? "text-white" : "text-black")}>
                 {event.title}
               </h1>
 
@@ -149,6 +153,23 @@ export default function EventPublicPage() {
                  </div>
               </div>
             </div>
+
+            {/* Imagem de Capa SEM CORTE à Direita */}
+            <div className="lg:col-span-6 flex justify-center lg:justify-end">
+               <div className="relative w-full max-w-[500px] aspect-[4/5] md:aspect-auto md:h-[600px] rounded-[2.5rem] overflow-hidden shadow-2xl bg-black/5 p-2 border border-white/10 backdrop-blur-sm">
+                  <div className="relative w-full h-full rounded-[2rem] overflow-hidden">
+                    <Image 
+                      src={event.coverUrl || "https://picsum.photos/seed/event/800/1000"} 
+                      alt={event.title} 
+                      fill 
+                      className="object-contain" // GARANTE QUE A IMAGEM NÃO SEJA CORTADA
+                      priority
+                      unoptimized
+                    />
+                  </div>
+               </div>
+            </div>
+
           </div>
         </div>
       </section>
@@ -196,7 +217,7 @@ export default function EventPublicPage() {
                 <div className={cn("flex items-center justify-between border-b pb-6", isDark ? "border-white/10" : "border-black/5")}>
                   <div className="flex items-center gap-4">
                     <div className="p-3 rounded-2xl" style={{ backgroundColor: secondary }}><MapPin className="h-6 w-6 text-white" /></div>
-                    <h2 className="text-2xl font-black font-headline uppercase tracking-tight">LOCALIZAÇÃO</h2>
+                    <h2 className="text-2xl font-black font-headline uppercase tracking-tight">ONDE SERÁ O NOSSO EVENTO</h2>
                   </div>
                 </div>
                 <div className={cn("p-6 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-4", isDark ? "bg-white/5 border-white/5" : "bg-black/5 border-black/5")}>
@@ -215,11 +236,12 @@ export default function EventPublicPage() {
             </div>
           </div>
 
-          <div className="lg:col-span-4 lg:-mt-64 relative">
+          {/* Lateral de Compra */}
+          <div className="lg:col-span-4 lg:-mt-32 relative">
              <div className="sticky top-24 space-y-6">
                 <Card className="bg-white rounded-[3rem] overflow-hidden border-none shadow-[0_50px_100px_rgba(0,0,0,0.3)]">
                   <CardHeader className="bg-white pt-10 pb-6 px-10">
-                    <CardTitle className="text-3xl font-black font-headline text-black italic">Ingressos</CardTitle>
+                    <CardTitle className="text-3xl font-black font-headline text-black italic uppercase">Ingressos</CardTitle>
                     <div className="h-1 w-20 mt-4 rounded-full" style={{ backgroundColor: `${primary}22` }} />
                   </CardHeader>
 
