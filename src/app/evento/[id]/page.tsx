@@ -128,7 +128,7 @@ export default function EventPublicPage() {
               )}
             </div>
 
-            <h1 className={cn("text-4xl md:text-7xl font-black font-headline leading-[1.1] tracking-tight uppercase", isDark ? "text-white" : "text-black")}>
+            <h1 className={cn("text-4xl md:text-7xl font-black font-headline leading-[1.1] tracking-tight", isDark ? "text-white" : "text-black")}>
               {event.title}
             </h1>
 
