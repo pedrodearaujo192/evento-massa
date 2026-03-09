@@ -34,6 +34,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -54,7 +55,10 @@ import {
   PlusCircle,
   Tag,
   Youtube,
-  Scissors
+  Scissors,
+  Palette,
+  Moon,
+  Sun
 } from 'lucide-react';
 import Image from 'next/image';
 
@@ -75,6 +79,9 @@ const eventSchema = z.object({
   youtubeUrl: z.string().url('Insira um link válido do YouTube').or(z.literal('')).optional(),
   certEnabled: z.boolean().default(false),
   attendanceMode: z.enum(['STRICT', 'EOD', 'SIMPLE']).default('EOD'),
+  primaryColor: z.string().default('#FF007F'),
+  secondaryColor: z.string().default('#22C55E'),
+  themeMode: z.enum(['light', 'dark']).default('dark'),
 });
 
 type EventFormValues = z.infer<typeof eventSchema>;
@@ -124,6 +131,9 @@ export default function NewEventPage() {
       youtubeUrl: '',
       certEnabled: false,
       attendanceMode: 'EOD',
+      primaryColor: '#FF007F',
+      secondaryColor: '#22C55E',
+      themeMode: 'dark',
     },
   });
 
@@ -209,6 +219,9 @@ export default function NewEventPage() {
         capacity: data.capacity,
         description: data.description,
         status: 'draft',
+        primaryColor: data.primaryColor,
+        secondaryColor: data.secondaryColor,
+        themeMode: data.themeMode,
         updatedAt: serverTimestamp(),
       };
 
@@ -282,7 +295,7 @@ export default function NewEventPage() {
     const fieldsByStep: Record<number, any[]> = {
       1: ['title', 'slug', 'category', 'sector'],
       2: ['startAt', 'endAt', 'city', 'state', 'address', 'capacity', 'mapUrl'],
-      3: ['description', 'youtubeUrl'],
+      3: ['description', 'youtubeUrl', 'primaryColor', 'secondaryColor', 'themeMode'],
     };
     const isValid = await form.trigger(fieldsByStep[step] as any);
     if (isValid) setStep(s => s + 1);
@@ -310,7 +323,7 @@ export default function NewEventPage() {
              <div key={s} className={cn("relative z-10 w-12 h-12 rounded-full flex items-center justify-center font-bold transition-all border-4 shadow-sm", step === s ? "bg-primary border-primary text-white scale-110" : step > s ? "bg-secondary border-secondary text-white" : "bg-background border-muted text-muted-foreground")}>
                {step > s ? <CheckCircle2 className="h-6 w-6" /> : s}
                <span className="absolute -bottom-8 text-[10px] font-black uppercase tracking-widest whitespace-nowrap text-foreground/70">
-                  {s === 1 ? 'Básico' : s === 2 ? 'Local' : s === 3 ? 'Mídia' : 'Revisão'}
+                  {s === 1 ? 'Básico' : s === 2 ? 'Local' : s === 3 ? 'Visual' : 'Revisão'}
                </span>
              </div>
            ))}
@@ -401,40 +414,90 @@ export default function NewEventPage() {
           {step === 3 && (
             <div className="space-y-8">
               <Card className="border-none shadow-2xl overflow-hidden">
-                <CardHeader className="bg-muted/30 border-b"><CardTitle className="flex items-center gap-2 font-headline"><ImageIcon className="h-5 w-5 text-primary" /> Visual e Detalhes</CardTitle></CardHeader>
+                <CardHeader className="bg-muted/30 border-b"><CardTitle className="flex items-center gap-2 font-headline"><Palette className="h-5 w-5 text-primary" /> Visual e Mídia</CardTitle></CardHeader>
                 <CardContent className="pt-8 space-y-8">
-                  <div className="space-y-4">
-                    <FormLabel className="font-bold">Capa do Evento (16:9 recomendado)</FormLabel>
-                    <div className={cn("relative h-80 w-full rounded-2xl border-4 border-dashed flex flex-col items-center justify-center transition-all bg-muted/10 group overflow-hidden", imagePreview ? "border-primary/30" : "border-muted/50 hover:border-primary/40")}>
-                      {imagePreview ? (
-                        <div className="relative w-full h-full">
-                          <Image src={imagePreview} alt="Preview" fill className="object-cover" />
-                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                             <Button variant="destructive" size="lg" className="font-bold" onClick={() => { setImageFile(null); }}>Trocar Imagem</Button>
-                          </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                     <div className="space-y-6">
+                        <FormLabel className="font-bold">Identidade do Evento</FormLabel>
+                        <div className="grid grid-cols-2 gap-4">
+                           <FormField control={form.control} name="primaryColor" render={({ field }) => (
+                              <FormItem>
+                                 <FormLabel className="text-xs">Cor Principal</FormLabel>
+                                 <div className="flex gap-2">
+                                    <Input type="color" {...field} className="w-12 h-10 p-1" />
+                                    <Input {...field} className="h-10" />
+                                 </div>
+                              </FormItem>
+                           )} />
+                           <FormField control={form.control} name="secondaryColor" render={({ field }) => (
+                              <FormItem>
+                                 <FormLabel className="text-xs">Cor Secundária</FormLabel>
+                                 <div className="flex gap-2">
+                                    <Input type="color" {...field} className="w-12 h-10 p-1" />
+                                    <Input {...field} className="h-10" />
+                                 </div>
+                              </FormItem>
+                           )} />
                         </div>
-                      ) : (
-                        <label className="w-full h-full flex flex-col items-center justify-center cursor-pointer p-10">
-                          <div className="bg-primary/10 p-5 rounded-full mb-4 group-hover:scale-110 transition-transform"><Upload className="h-8 w-8 text-primary" /></div>
-                          <span className="text-lg font-black text-foreground">Clique para selecionar imagem</span>
-                          <span className="text-sm text-muted-foreground mt-2">JPG, PNG ou WEBP até 5MB</span>
-                          <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
-                        </label>
-                      )}
-                    </div>
+
+                        <FormField control={form.control} name="themeMode" render={({ field }) => (
+                          <FormItem className="flex items-center justify-between p-4 bg-muted/30 rounded-xl">
+                            <div>
+                               <FormLabel className="font-bold">Modo Escuro (Dark Mode)</FormLabel>
+                               <FormDescription>Se ativado, o fundo da página será escuro.</FormDescription>
+                            </div>
+                            <FormControl>
+                               <Switch 
+                                  checked={field.value === 'dark'} 
+                                  onCheckedChange={(val) => field.onChange(val ? 'dark' : 'light')} 
+                               />
+                            </FormControl>
+                          </FormItem>
+                        )} />
+
+                        <div className="p-4 border rounded-xl bg-muted/10">
+                           <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4">Prévia do Estilo</p>
+                           <div className={cn("p-6 rounded-lg transition-all", form.watch('themeMode') === 'dark' ? 'bg-black text-white' : 'bg-white text-black border')}>
+                              <div className="flex gap-2 mb-4">
+                                 <div className="h-3 w-12 rounded-full" style={{ backgroundColor: form.watch('primaryColor') }} />
+                                 <div className="h-3 w-8 rounded-full" style={{ backgroundColor: form.watch('secondaryColor') }} />
+                              </div>
+                              <p className="text-sm font-bold">Título do Evento</p>
+                              <Button className="mt-4 w-full h-8 text-[10px]" style={{ backgroundColor: form.watch('primaryColor') }}>BOTÃO DE COMPRA</Button>
+                           </div>
+                        </div>
+                     </div>
+
+                     <div className="space-y-4">
+                        <FormLabel className="font-bold">Capa do Evento (16:9)</FormLabel>
+                        <div className={cn("relative h-64 w-full rounded-2xl border-4 border-dashed flex flex-col items-center justify-center transition-all bg-muted/10 group overflow-hidden", imagePreview ? "border-primary/30" : "border-muted/50 hover:border-primary/40")}>
+                          {imagePreview ? (
+                            <div className="relative w-full h-full">
+                              <Image src={imagePreview} alt="Preview" fill className="object-cover" />
+                              <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                 <Button variant="destructive" size="sm" onClick={() => { setImageFile(null); }}>Trocar Imagem</Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <label className="w-full h-full flex flex-col items-center justify-center cursor-pointer">
+                              <Upload className="h-8 w-8 text-primary mb-2" />
+                              <span className="text-xs font-black">Selecionar Capa</span>
+                              <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
+                            </label>
+                          )}
+                        </div>
+                        <FormField control={form.control} name="youtubeUrl" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="font-bold text-xs flex items-center gap-2"><Youtube className="h-4 w-4 text-red-600" /> Link do YouTube</FormLabel>
+                            <FormControl><Input placeholder="https://www.youtube.com/watch?v=..." {...field} className="h-10" /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                     </div>
                   </div>
 
-                  <FormField control={form.control} name="youtubeUrl" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="font-bold flex items-center gap-2"><Youtube className="h-4 w-4 text-red-600" /> Link do Vídeo (YouTube)</FormLabel>
-                      <FormControl><Input placeholder="https://www.youtube.com/watch?v=..." {...field} className="h-12" /></FormControl>
-                      <FormDescription>Um vídeo de apresentação ajuda muito nas vendas.</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-
                   <FormField control={form.control} name="description" render={({ field }) => (
-                    <FormItem><FormLabel className="font-bold">Conteúdo e Programação</FormLabel><FormControl><Textarea placeholder="Descreva o que os participantes aprenderão, cronograma, etc..." className="min-h-[250px] text-lg leading-relaxed rounded-xl" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel className="font-bold">Descrição Completa</FormLabel><FormControl><Textarea placeholder="Descreva os detalhes..." className="min-h-[200px] rounded-xl" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
                 </CardContent>
               </Card>

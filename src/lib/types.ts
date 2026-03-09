@@ -45,6 +45,10 @@ export interface Event {
   status: 'draft' | 'published' | 'ended';
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  // Visual Customization
+  primaryColor?: string;
+  secondaryColor?: string;
+  themeMode?: 'light' | 'dark';
 }
 
 export interface TicketType {
