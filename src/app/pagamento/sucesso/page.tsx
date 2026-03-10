@@ -69,10 +69,11 @@ function SucessoContent() {
               batch.set(ticketRef, {
                 orderId: orderId,
                 eventId: orderData.eventId,
-                ticketTypeId: item.id, // Armazenar o ID do lote
+                ticketTypeId: item.id,
                 userId: orderData.userId || 'guest',
                 userName: orderData.customer?.fullName || 'Participante',
                 userEmail: orderData.customer?.email || '',
+                userPhone: orderData.customer?.phone || '',
                 ticketName: item.name || 'Ingresso',
                 status: 'ativo',
                 checkedInAt: null,

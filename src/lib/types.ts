@@ -74,6 +74,7 @@ export interface Order {
     fullName: string;
     document: string;
     email: string;
+    phone?: string;
     address: string;
     city: string;
     zip: string;
@@ -95,6 +96,7 @@ export interface Ticket {
   userId: string;
   userName: string;
   userEmail: string;
+  userPhone?: string;
   ticketName: string;
   status: 'ativo' | 'usado' | 'cancelado';
   checkedInAt: Timestamp | null;

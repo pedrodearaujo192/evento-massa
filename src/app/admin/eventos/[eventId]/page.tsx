@@ -94,7 +94,8 @@ import {
   XCircle,
   UserCog,
   UserX,
-  Palette
+  Palette,
+  Phone
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -124,6 +125,7 @@ interface EventTicket {
   ticketTypeId: string;
   userName: string;
   userEmail: string;
+  userPhone?: string;
   ticketName: string;
   status: 'ativo' | 'usado' | 'cancelado';
   checkedInAt: Timestamp | null;
@@ -401,6 +403,7 @@ export default function ManageEventPage() {
     const formData = new FormData(e.currentTarget);
     const fullName = formData.get('fullName') as string;
     const email = formData.get('email') as string;
+    const phone = formData.get('phone') as string;
     const docStr = formData.get('document') as string;
     const ticketTypeId = formData.get('ticketTypeId') as string;
     
@@ -423,6 +426,7 @@ export default function ManageEventPage() {
         customer: {
           fullName,
           email,
+          phone,
           document: docStr,
           address: 'Venda Manual / Cortesia',
           city: '',
@@ -448,6 +452,7 @@ export default function ManageEventPage() {
         userId: 'admin-manual',
         userName: fullName,
         userEmail: email,
+        userPhone: phone,
         ticketName: ticketType.name,
         status: 'ativo',
         checkedInAt: null,
@@ -476,11 +481,13 @@ export default function ManageEventPage() {
     const formData = new FormData(e.currentTarget);
     const userName = formData.get('userName') as string;
     const userEmail = formData.get('userEmail') as string;
+    const userPhone = formData.get('userPhone') as string;
 
     try {
       await updateDoc(doc(db, 'ingressos', editingParticipantTicket.id), {
         userName,
         userEmail,
+        userPhone,
         updatedAt: serverTimestamp()
       });
       toast({ title: 'Participante atualizado!', description: 'Os dados do ingresso foram salvos.' });
@@ -672,9 +679,15 @@ export default function ManageEventPage() {
                   <Label>Nome Completo</Label>
                   <Input name="fullName" required />
                 </div>
-                <div className="space-y-2">
-                  <Label>E-mail</Label>
-                  <Input name="email" type="email" required />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>E-mail</Label>
+                    <Input name="email" type="email" required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Telefone (Opcional)</Label>
+                    <Input name="phone" placeholder="(00) 00000-0000" />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Documento (CPF/CNPJ)</Label>
@@ -829,6 +842,7 @@ export default function ManageEventPage() {
                     <TableCell>
                       <div className="font-bold">{t.userName}</div>
                       <div className="text-xs text-muted-foreground">{t.userEmail}</div>
+                      {t.userPhone && <div className="text-[10px] text-muted-foreground/70 flex items-center gap-1 mt-0.5"><Phone className="h-2.5 w-2.5" /> {t.userPhone}</div>}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="font-mono text-[10px]">{t.ticketName}</Badge>
@@ -1071,9 +1085,15 @@ export default function ManageEventPage() {
               <Label>Nome</Label>
               <Input name="userName" defaultValue={editingParticipantTicket?.userName} required />
             </div>
-            <div className="space-y-2">
-              <Label>E-mail</Label>
-              <Input name="userEmail" type="email" defaultValue={editingParticipantTicket?.userEmail} required />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>E-mail</Label>
+                <Input name="userEmail" type="email" defaultValue={editingParticipantTicket?.userEmail} required />
+              </div>
+              <div className="space-y-2">
+                <Label>Telefone</Label>
+                <Input name="userPhone" defaultValue={editingParticipantTicket?.userPhone} />
+              </div>
             </div>
             <DialogFooter>
               <Button type="submit" disabled={isUpdatingParticipant}>

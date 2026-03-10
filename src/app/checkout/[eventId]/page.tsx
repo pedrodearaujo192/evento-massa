@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, ArrowLeft, Info, AlertTriangle, CreditCard, ShieldCheck, Mail, InfoIcon } from 'lucide-react';
+import { Loader2, ArrowLeft, Info, AlertTriangle, CreditCard, ShieldCheck, Mail, InfoIcon, Phone } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 
@@ -31,6 +31,7 @@ export default function CheckoutPage() {
     document: '',
     email: '',
     confirmEmail: '',
+    phone: '',
     address: 'Venda Online',
     city: '',
     zip: ''
@@ -148,10 +149,11 @@ export default function CheckoutPage() {
             batch.set(ticketRef, {
               orderId: orderRef.id,
               eventId,
-              ticketTypeId: item.id, // Armazenar o ID do lote
+              ticketTypeId: item.id,
               userId: user?.uid || 'guest',
               userName: customerData.fullName,
               userEmail: customerData.email,
+              userPhone: customerData.phone || '',
               ticketName: item.name,
               status: 'ativo',
               checkedInAt: null,
@@ -210,17 +212,29 @@ export default function CheckoutPage() {
                     <Input name="fullName" value={formData.fullName} onChange={handleChange} placeholder="Nome e Sobrenome (Obrigatório)" required className="h-12" />
                   </div>
                   
-                  <div className="space-y-2">
-                    <Label className="font-bold">CPF/CNPJ (digite apenas números)</Label>
-                    <Input 
-                      name="document" 
-                      value={formData.document} 
-                      onChange={handleChange} 
-                      placeholder="Ex: 00000000000" 
-                      required 
-                      className="h-12"
-                      inputMode="numeric"
-                    />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label className="font-bold">CPF/CNPJ (apenas números)</Label>
+                      <Input 
+                        name="document" 
+                        value={formData.document} 
+                        onChange={handleChange} 
+                        placeholder="Ex: 00000000000" 
+                        required 
+                        className="h-12"
+                        inputMode="numeric"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="font-bold flex items-center gap-2"><Phone className="h-4 w-4" /> Telefone (Opcional)</Label>
+                      <Input 
+                        name="phone" 
+                        value={formData.phone} 
+                        onChange={handleChange} 
+                        placeholder="(00) 00000-0000" 
+                        className="h-12"
+                      />
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -240,7 +254,7 @@ export default function CheckoutPage() {
             <Alert className="bg-blue-50 border-blue-200">
               <ShieldCheck className="h-4 w-4 text-blue-600" />
               <AlertDescription className="text-xs text-blue-700">
-                Você será redirecionado para o ambiente seguro do Mercado Pago para escolher sua forma de pagamento (PIX, Cartão ou Boleto).
+                Você será redirecionado para o ambiente seguro do Mercado Pago para escolher sua forma de pagamento.
               </AlertDescription>
             </Alert>
           </div>
