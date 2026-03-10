@@ -394,6 +394,153 @@ export default function ManageEventPage() {
     }
   };
 
+  const handleAddGuest = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsAddingGuest(true);
+    
+    const formData = new FormData(e.currentTarget);
+    const fullName = formData.get('fullName') as string;
+    const email = formData.get('email') as string;
+    const docStr = formData.get('document') as string;
+    const ticketTypeId = formData.get('ticketTypeId') as string;
+    
+    if (!ticketTypeId) {
+      toast({ variant: 'destructive', title: 'Erro', description: 'Selecione um tipo de ingresso.' });
+      setIsAddingGuest(false);
+      return;
+    }
+
+    const ticketType = ticketTypes.find(t => t.id === ticketTypeId);
+    if (!ticketType) return;
+
+    try {
+      const batch = writeBatch(db);
+      
+      const orderRef = doc(collection(db, 'pedidos'));
+      batch.set(orderRef, {
+        eventId,
+        userId: 'admin-manual',
+        customer: {
+          fullName,
+          email,
+          document: docStr,
+          address: 'Venda Manual / Cortesia',
+          city: '',
+          zip: ''
+        },
+        items: [{
+          id: ticketTypeId,
+          name: ticketType.name,
+          qty: 1,
+          priceCents: ticketType.priceCents
+        }],
+        total: ticketType.priceCents / 100,
+        status: 'pago',
+        type: 'manual',
+        createdAt: serverTimestamp()
+      });
+
+      const ticketRef = doc(collection(db, 'ingressos'));
+      batch.set(ticketRef, {
+        orderId: orderRef.id,
+        eventId,
+        ticketTypeId,
+        userId: 'admin-manual',
+        userName: fullName,
+        userEmail: email,
+        ticketName: ticketType.name,
+        status: 'ativo',
+        checkedInAt: null,
+        createdAt: serverTimestamp()
+      });
+
+      const typeRef = doc(db, 'eventos', eventId as string, 'ticketTypes', ticketTypeId);
+      batch.update(typeRef, { soldCount: increment(1) });
+
+      await batch.commit();
+      
+      toast({ title: 'Participante adicionado!', description: `${fullName} foi cadastrado com sucesso.` });
+      setIsGuestModalOpen(false);
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Erro ao adicionar', description: error.message });
+    } finally {
+      setIsAddingGuest(false);
+    }
+  };
+
+  const handleUpdateParticipant = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingParticipantTicket) return;
+    setIsUpdatingParticipant(true);
+    
+    const formData = new FormData(e.currentTarget);
+    const userName = formData.get('userName') as string;
+    const userEmail = formData.get('userEmail') as string;
+
+    try {
+      await updateDoc(doc(db, 'ingressos', editingParticipantTicket.id), {
+        userName,
+        userEmail,
+        updatedAt: serverTimestamp()
+      });
+      toast({ title: 'Participante atualizado!', description: 'Os dados do ingresso foram salvos.' });
+      setIsEditParticipantModalOpen(false);
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Erro ao atualizar', description: error.message });
+    } finally {
+      setIsUpdatingParticipant(false);
+    }
+  };
+
+  const handleDeleteParticipant = async () => {
+    if (!participantTicketToDelete) return;
+    setIsDeletingParticipant(true);
+
+    try {
+      const batch = writeBatch(db);
+      
+      // Deletar o ingresso
+      batch.delete(doc(db, 'ingressos', participantTicketToDelete.id));
+
+      // Decrementar o contador de vendas se possível
+      if (participantTicketToDelete.ticketTypeId) {
+        const typeRef = doc(db, 'eventos', eventId as string, 'ticketTypes', participantTicketToDelete.ticketTypeId);
+        batch.update(typeRef, { soldCount: increment(-1) });
+      }
+
+      await batch.commit();
+      toast({ title: 'Participante removido!', description: 'O ingresso foi cancelado e a vaga liberada.' });
+      setIsDeleteParticipantDialogOpen(false);
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Erro ao remover', description: error.message });
+    } finally {
+      setIsDeletingParticipant(false);
+    }
+  };
+
+  const handleAddTicketType = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsAddingTicketType(true);
+    const formData = new FormData(e.currentTarget);
+    
+    try {
+      await addDoc(collection(db, 'eventos', eventId as string, 'ticketTypes'), {
+        name: formData.get('name'),
+        description: formData.get('description'),
+        priceType: formData.get('priceType'),
+        priceCents: formData.get('priceType') === 'free' ? 0 : Number(formData.get('price')) * 100,
+        quantity: Number(formData.get('quantity')),
+        soldCount: 0,
+        active: true,
+        createdAt: serverTimestamp(),
+      });
+      toast({ title: 'Lote criado!', description: 'Novo tipo de ingresso adicionado.' });
+      setIsTicketModalOpen(false);
+    } finally {
+      setIsAddingTicketType(false);
+    }
+  };
+
   const handleUpdateEvent = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSavingEdit(true);
@@ -579,6 +726,75 @@ export default function ManageEventPage() {
                   <Image src={event.coverUrl || "https://picsum.photos/seed/1/600/400"} alt="Capa" fill className="object-cover" />
                 </div>
              </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="tickets" className="space-y-4">
+          <Card className="border-none shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Lotes e Ingressos</CardTitle>
+              <Dialog open={isTicketModalOpen} onOpenChange={setIsTicketModalOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-primary"><Plus className="mr-2 h-4 w-4" /> NOVO LOTE</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader><DialogTitle>Criar Novo Lote</DialogTitle></DialogHeader>
+                  <form onSubmit={handleAddTicketType} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Nome do Lote</Label>
+                      <Input name="name" placeholder="Ex: Ingresso VIP" required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Tipo</Label>
+                      <Select name="priceType" defaultValue="paid">
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="paid">Pago</SelectItem>
+                          <SelectItem value="free">Grátis</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Preço (R$)</Label>
+                        <Input name="price" type="number" step="0.01" defaultValue="0" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Quantidade</Label>
+                        <Input name="quantity" type="number" required />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Descrição (Opcional)</Label>
+                      <Textarea name="description" placeholder="O que está incluso?" />
+                    </div>
+                    <Button type="submit" disabled={isAddingTicketType} className="w-full">CRIAR LOTE</Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </CardHeader>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Lote</TableHead>
+                  <TableHead>Preço</TableHead>
+                  <TableHead>Vendas</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {ticketTypes.map(type => (
+                  <TableRow key={type.id}>
+                    <TableCell className="font-bold">{type.name}</TableCell>
+                    <TableCell>{type.priceType === 'free' ? 'Grátis' : `R$ ${(type.priceCents/100).toFixed(2)}`}</TableCell>
+                    <TableCell>{type.soldCount} / {type.quantity}</TableCell>
+                    <TableCell>
+                      <Badge variant={type.active ? 'default' : 'secondary'}>{type.active ? 'ATIVO' : 'INATIVO'}</Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </Card>
         </TabsContent>
 
@@ -846,7 +1062,43 @@ export default function ManageEventPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Modais de Edição/Remoção e Scanner (Omitidos para brevidade, mas funcionais) */}
+      {/* MODAL EDITAR PARTICIPANTE */}
+      <Dialog open={isEditParticipantModalOpen} onOpenChange={setIsEditParticipantModalOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Editar Participante</DialogTitle></DialogHeader>
+          <form onSubmit={handleUpdateParticipant} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Nome</Label>
+              <Input name="userName" defaultValue={editingParticipantTicket?.userName} required />
+            </div>
+            <div className="space-y-2">
+              <Label>E-mail</Label>
+              <Input name="userEmail" type="email" defaultValue={editingParticipantTicket?.userEmail} required />
+            </div>
+            <DialogFooter>
+              <Button type="submit" disabled={isUpdatingParticipant}>
+                {isUpdatingParticipant && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} SALVAR
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ALERTA EXCLUIR PARTICIPANTE */}
+      <AlertDialog open={isDeleteParticipantDialogOpen} onOpenChange={setIsDeleteParticipantDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover participante?</AlertDialogTitle>
+            <AlertDialogDescription>Esta ação cancelará o ingresso de {participantTicketToDelete?.userName}. A vaga voltará para o estoque do lote.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteParticipant} className="bg-destructive text-white">REMOVER AGORA</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* SCANNER QR CODE */}
       <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
         <DialogContent className="max-w-md p-0 overflow-hidden bg-black border-none">
           <div className="relative aspect-square">
