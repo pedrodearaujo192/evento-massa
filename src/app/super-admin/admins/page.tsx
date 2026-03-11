@@ -15,7 +15,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Loader2, PlusCircle, User } from 'lucide-react';
+import { Loader2, PlusCircle } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -118,7 +118,7 @@ export default function AdminsPage() {
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-3">
                       <Avatar className="h-9 w-9">
-                        <AvatarImage src={`https://picsum.photos/seed/${admin.uid}/100/100`} data-ai-hint="person portrait" />
+                        <AvatarImage src={`https://picsum.photos/seed/${admin.uid}/100/100`} />
                         <AvatarFallback className="bg-secondary text-secondary-foreground font-semibold">
                           {getInitials(admin.nome)}
                         </AvatarFallback>

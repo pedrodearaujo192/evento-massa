@@ -15,7 +15,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
-import { Loader2, PlusCircle, Calendar, MapPin, Edit, MoreVertical, Settings, Trash2 } from 'lucide-react';
+import { Loader2, PlusCircle, Calendar, MapPin, MoreVertical, Settings, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -161,7 +161,7 @@ export default function DashboardPage() {
                         <DropdownMenuItem 
                           className="cursor-pointer text-destructive focus:text-white focus:bg-destructive"
                           onClick={() => {
-                            setMenuOpenId(null); // Fechar menu antes de abrir diálogo
+                            setMenuOpenId(null);
                             setEventToDelete(event);
                             setIsDeleteDialogOpen(true);
                           }}
@@ -178,7 +178,6 @@ export default function DashboardPage() {
                     alt={event.title}
                     fill
                     className="object-cover"
-                    data-ai-hint="event cover"
                   />
                   <Badge variant="secondary" className="absolute top-3 left-3 bg-white/90 text-primary font-bold">{event.category}</Badge>
                 </div>
@@ -211,7 +210,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Exclusão do Dashboard */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

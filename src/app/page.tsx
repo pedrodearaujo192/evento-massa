@@ -22,7 +22,6 @@ export default function HomePage() {
   useEffect(() => {
     async function loadEvents() {
       try {
-        // Busca eventos com status 'published' conforme o banco de dados
         const q = query(
           collection(db, 'eventos'), 
           where('status', '==', 'published'),
