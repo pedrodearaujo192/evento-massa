@@ -170,7 +170,7 @@ export default function ManageEventPage() {
   const [isUpdatingTicketType, setIsUpdatingTicketType] = useState(false);
 
   const [ticketToDelete, setTicketToDelete] = useState<TicketType | null>(null);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleteTicketDialogOpen, setIsDeleteTicketDialogOpen] = useState(false);
   const [isDeletingTicketType, setIsDeletingTicketType] = useState(false);
 
   const [editingParticipantTicket, setEditingParticipantTicket] = useState<EventTicket | null>(null);
@@ -547,6 +547,32 @@ export default function ManageEventPage() {
     }
   };
 
+  const handleDeleteTicketType = async () => {
+    if (!ticketToDelete) return;
+    
+    if (ticketToDelete.soldCount > 0) {
+      toast({ 
+        variant: 'destructive', 
+        title: 'Não é possível excluir', 
+        description: 'Este lote já possui ingressos vendidos. Desative-o em vez de excluir para manter o histórico.' 
+      });
+      setIsDeleteTicketDialogOpen(false);
+      return;
+    }
+
+    setIsDeletingTicketType(true);
+    try {
+      await deleteDoc(doc(db, 'eventos', eventId as string, 'ticketTypes', ticketToDelete.id));
+      toast({ title: 'Lote excluído!', description: 'O tipo de ingresso foi removido.' });
+      setIsDeleteTicketDialogOpen(false);
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Erro ao excluir', description: error.message });
+    } finally {
+      setIsDeletingTicketType(false);
+      setTicketToDelete(null);
+    }
+  };
+
   const handleUpdateEvent = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSavingEdit(true);
@@ -792,6 +818,7 @@ export default function ManageEventPage() {
                   <TableHead>Preço</TableHead>
                   <TableHead>Vendas</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -802,6 +829,21 @@ export default function ManageEventPage() {
                     <TableCell>{type.soldCount} / {type.quantity}</TableCell>
                     <TableCell>
                       <Badge variant={type.active ? 'default' : 'secondary'}>{type.active ? 'ATIVO' : 'INATIVO'}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="text-destructive hover:bg-destructive/10" 
+                          onClick={() => {
+                            setTicketToDelete(type);
+                            setIsDeleteTicketDialogOpen(true);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -1111,6 +1153,31 @@ export default function ManageEventPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteParticipant} className="bg-destructive text-white">REMOVER AGORA</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isDeleteTicketDialogOpen} onOpenChange={setIsDeleteTicketDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir lote de ingressos?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Você está prestes a excluir o lote <strong>{ticketToDelete?.name}</strong>. Esta ação não pode ser desfeita. 
+              {ticketToDelete?.soldCount && ticketToDelete.soldCount > 0 ? (
+                <span className="block mt-2 font-bold text-destructive">AVISO: Este lote possui vendas. Recomenda-se apenas desativá-lo.</span>
+              ) : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteTicketType} 
+              className="bg-destructive text-white"
+              disabled={isDeletingTicketType}
+            >
+              {isDeletingTicketType ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              EXCLUIR LOTE
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
