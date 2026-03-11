@@ -105,6 +105,8 @@ import Link from 'next/link';
 import jsQR from 'jsqr';
 import { cn } from '@/lib/utils';
 
+export const dynamic = 'force-dynamic';
+
 interface TicketType {
   id: string;
   name: string;
@@ -193,7 +195,6 @@ export default function ManageEventPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const scanIntervalRef = useRef<number | null>(null);
 
-  // Form State for Visuals
   const [primaryColor, setPrimaryColor] = useState('#FF007F');
   const [secondaryColor, setSecondaryColor] = useState('#22C55E');
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>('dark');
@@ -426,7 +427,7 @@ export default function ManageEventPage() {
         customer: {
           fullName,
           email,
-          phone,
+          phone: phone || '',
           document: docStr,
           address: 'Venda Manual / Cortesia',
           city: '',
@@ -452,7 +453,7 @@ export default function ManageEventPage() {
         userId: 'admin-manual',
         userName: fullName,
         userEmail: email,
-        userPhone: phone,
+        userPhone: phone || '',
         ticketName: ticketType.name,
         status: 'ativo',
         checkedInAt: null,
@@ -487,7 +488,7 @@ export default function ManageEventPage() {
       await updateDoc(doc(db, 'ingressos', editingParticipantTicket.id), {
         userName,
         userEmail,
-        userPhone,
+        userPhone: userPhone || '',
         updatedAt: serverTimestamp()
       });
       toast({ title: 'Participante atualizado!', description: 'Os dados do ingresso foram salvos.' });
@@ -506,10 +507,8 @@ export default function ManageEventPage() {
     try {
       const batch = writeBatch(db);
       
-      // Deletar o ingresso
       batch.delete(doc(db, 'ingressos', participantTicketToDelete.id));
 
-      // Decrementar o contador de vendas se possível
       if (participantTicketToDelete.ticketTypeId) {
         const typeRef = doc(db, 'eventos', eventId as string, 'ticketTypes', participantTicketToDelete.ticketTypeId);
         batch.update(typeRef, { soldCount: increment(-1) });
@@ -1076,7 +1075,6 @@ export default function ManageEventPage() {
         </TabsContent>
       </Tabs>
 
-      {/* MODAL EDITAR PARTICIPANTE */}
       <Dialog open={isEditParticipantModalOpen} onOpenChange={setIsEditParticipantModalOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Editar Participante</DialogTitle></DialogHeader>
@@ -1104,7 +1102,6 @@ export default function ManageEventPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ALERTA EXCLUIR PARTICIPANTE */}
       <AlertDialog open={isDeleteParticipantDialogOpen} onOpenChange={setIsDeleteParticipantDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1118,7 +1115,6 @@ export default function ManageEventPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* SCANNER QR CODE */}
       <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
         <DialogContent className="max-w-md p-0 overflow-hidden bg-black border-none">
           <div className="relative aspect-square">

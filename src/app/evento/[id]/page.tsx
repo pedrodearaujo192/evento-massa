@@ -15,6 +15,8 @@ import { ptBR } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
+export const dynamic = 'force-dynamic';
+
 export default function EventPublicPage() {
   const { id } = useParams();
   const router = useRouter();
@@ -98,11 +100,9 @@ export default function EventPublicPage() {
     <div className={cn("min-h-screen transition-colors duration-500", isDark ? "bg-black text-white" : "bg-white text-black")}>
       <Navbar />
       
-      {/* Seção Principal - Flyer Centralizado 1000px */}
       <main className="container mx-auto px-4 py-8 md:py-12">
         <div className="max-w-[1000px] mx-auto space-y-12">
           
-          {/* FLYER DO EVENTO - SEM CORTE E PROPORCIONAL */}
           <section className="relative w-full rounded-[2.5rem] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.3)] bg-black/5 flex justify-center">
              <Image 
                src={event.coverUrl || "https://picsum.photos/seed/event/1000/1200"} 
@@ -115,7 +115,6 @@ export default function EventPublicPage() {
              />
           </section>
 
-          {/* CABEÇALHO DE INFORMAÇÕES - LOGO ABAIXO DA IMAGEM */}
           <section className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700">
             <div className="flex flex-wrap gap-3">
               <Badge className="px-6 py-2 rounded-full font-black uppercase tracking-widest text-[10px] text-white border-none" style={{ backgroundColor: primary }}>
@@ -154,13 +153,10 @@ export default function EventPublicPage() {
             </div>
           </section>
 
-          {/* GRID DE CONTEÚDO E INGRESSOS */}
           <section className="grid grid-cols-1 lg:grid-cols-12 gap-10">
             
-            {/* COLUNA DA ESQUERDA - DETALHES */}
             <div className="lg:col-span-7 space-y-10">
               
-              {/* DESCRIÇÃO */}
               <div className={cn("p-10 rounded-[2.5rem] border space-y-6", isDark ? "bg-white/5 border-white/10" : "bg-black/5 border-black/5")}>
                  <div className="flex items-center gap-3">
                     <Info className="h-6 w-6" style={{ color: primary }} />
@@ -180,7 +176,6 @@ export default function EventPublicPage() {
                 )}
               </div>
 
-              {/* VÍDEO DO YOUTUBE */}
               {embedUrl && (
                 <div className={cn("rounded-[2.5rem] overflow-hidden border shadow-xl", isDark ? "border-white/10" : "border-black/5")}>
                   <div className="aspect-video">
@@ -189,7 +184,6 @@ export default function EventPublicPage() {
                 </div>
               )}
 
-              {/* LOCALIZAÇÃO */}
               <div className={cn("p-10 rounded-[2.5rem] border space-y-6", isDark ? "bg-white/5 border-white/10" : "bg-black/5 border-black/5")}>
                  <div className="flex items-center gap-3">
                     <MapPin className="h-6 w-6" style={{ color: secondary }} />
@@ -211,7 +205,6 @@ export default function EventPublicPage() {
               </div>
             </div>
 
-            {/* COLUNA DA DIREITA - CARD DE COMPRA */}
             <div className="lg:col-span-5 relative">
               <div className="sticky top-28">
                 <Card className="rounded-[3rem] border-none shadow-[0_40px_80px_rgba(0,0,0,0.3)] bg-white overflow-hidden">
@@ -270,7 +263,6 @@ export default function EventPublicPage() {
         </div>
       </main>
 
-      {/* RODAPÉ SIMPLES */}
       <footer className={cn("py-12 border-t mt-20", isDark ? "border-white/10 text-white/30" : "border-black/5 text-black/30")}>
         <div className="container mx-auto px-4 text-center">
           <p className="text-[10px] font-black uppercase tracking-[0.3em]">© 2024 EventoMassa - Todos os direitos reservados</p>
