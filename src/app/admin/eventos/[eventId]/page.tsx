@@ -95,7 +95,8 @@ import {
   UserCog,
   UserX,
   Palette,
-  Phone
+  Phone,
+  Pencil
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -537,13 +538,37 @@ export default function ManageEventPage() {
         priceCents: formData.get('priceType') === 'free' ? 0 : Number(formData.get('price')) * 100,
         quantity: Number(formData.get('quantity')),
         soldCount: 0,
-        active: true,
+        active: formData.get('active') === 'on',
         createdAt: serverTimestamp(),
       });
       toast({ title: 'Lote criado!', description: 'Novo tipo de ingresso adicionado.' });
       setIsTicketModalOpen(false);
     } finally {
       setIsAddingTicketType(false);
+    }
+  };
+
+  const handleUpdateTicketType = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingTicketType) return;
+    setIsUpdatingTicketType(true);
+    const formData = new FormData(e.currentTarget);
+    
+    try {
+      const typeRef = doc(db, 'eventos', eventId as string, 'ticketTypes', editingTicketType.id);
+      await updateDoc(typeRef, {
+        name: formData.get('name'),
+        description: formData.get('description'),
+        priceType: formData.get('priceType'),
+        priceCents: formData.get('priceType') === 'free' ? 0 : Number(formData.get('price')) * 100,
+        quantity: Number(formData.get('quantity')),
+        active: formData.get('active') === 'on',
+        updatedAt: serverTimestamp(),
+      });
+      toast({ title: 'Lote atualizado!', description: 'As alterações foram salvas.' });
+      setIsEditTicketModalOpen(false);
+    } finally {
+      setIsUpdatingTicketType(false);
     }
   };
 
@@ -806,6 +831,10 @@ export default function ManageEventPage() {
                       <Label>Descrição (Opcional)</Label>
                       <Textarea name="description" placeholder="O que está incluso?" />
                     </div>
+                    <div className="flex items-center justify-between p-4 bg-muted/20 rounded-lg">
+                       <Label className="flex-1 cursor-pointer" htmlFor="active-new">Ingresso Ativo (Visível no site)</Label>
+                       <Switch name="active" id="active-new" defaultChecked />
+                    </div>
                     <Button type="submit" disabled={isAddingTicketType} className="w-full">CRIAR LOTE</Button>
                   </form>
                 </DialogContent>
@@ -832,6 +861,16 @@ export default function ManageEventPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => {
+                            setEditingTicketType(type);
+                            setIsEditTicketModalOpen(true);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
                         <Button 
                           variant="ghost" 
                           size="icon" 
@@ -934,41 +973,32 @@ export default function ManageEventPage() {
                 <Badge variant="secondary" className="h-10 px-4 font-bold">{totalCheckIns} confirmados</Badge>
               </div>
             </CardHeader>
-            <Table>
-              <TableHeader className="bg-muted/50">
-                <TableRow>
-                  <TableHead>Participante</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Ação</TableHead>
+            <TableBody>
+              {filteredTickets.map(t => (
+                <TableRow key={t.id}>
+                  <TableCell>
+                    <div className="font-bold">{t.userName}</div>
+                    <div className="text-xs text-muted-foreground">{t.ticketName}</div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={t.status === 'usado' ? 'default' : 'secondary'} className={t.status === 'usado' ? 'bg-green-500' : ''}>
+                      {t.status === 'usado' ? 'ENTROU' : 'PENDENTE'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {t.status !== 'usado' ? (
+                      <Button size="sm" onClick={() => handleCheckIn(t.id)} className="bg-secondary text-white font-bold">
+                        <UserCheck className="mr-2 h-4 w-4" /> CONFIRMAR
+                      </Button>
+                    ) : (
+                      <Button variant="ghost" size="sm" onClick={() => handleUndoCheckIn(t.id)} className="text-destructive">
+                        <RotateCcw className="h-4 w-4 mr-1" /> ESTORNAR
+                      </Button>
+                    )}
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredTickets.map(t => (
-                  <TableRow key={t.id}>
-                    <TableCell>
-                      <div className="font-bold">{t.userName}</div>
-                      <div className="text-xs text-muted-foreground">{t.ticketName}</div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={t.status === 'usado' ? 'default' : 'secondary'} className={t.status === 'usado' ? 'bg-green-500' : ''}>
-                        {t.status === 'usado' ? 'ENTROU' : 'PENDENTE'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {t.status !== 'usado' ? (
-                        <Button size="sm" onClick={() => handleCheckIn(t.id)} className="bg-secondary text-white font-bold">
-                          <UserCheck className="mr-2 h-4 w-4" /> CONFIRMAR
-                        </Button>
-                      ) : (
-                        <Button variant="ghost" size="sm" onClick={() => handleUndoCheckIn(t.id)} className="text-destructive">
-                          <RotateCcw className="h-4 w-4 mr-1" /> ESTORNAR
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+              ))}
+            </TableBody>
           </Card>
         </TabsContent>
 
@@ -1116,6 +1146,49 @@ export default function ManageEventPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={isEditTicketModalOpen} onOpenChange={setIsEditTicketModalOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Editar Lote</DialogTitle></DialogHeader>
+          <form onSubmit={handleUpdateTicketType} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Nome do Lote</Label>
+              <Input name="name" defaultValue={editingTicketType?.name} required />
+            </div>
+            <div className="space-y-2">
+              <Label>Tipo</Label>
+              <Select name="priceType" defaultValue={editingTicketType?.priceType}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="paid">Pago</SelectItem>
+                  <SelectItem value="free">Grátis</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Preço (R$)</Label>
+                <Input name="price" type="number" step="0.01" defaultValue={editingTicketType ? (editingTicketType.priceCents / 100) : 0} />
+              </div>
+              <div className="space-y-2">
+                <Label>Quantidade</Label>
+                <Input name="quantity" type="number" defaultValue={editingTicketType?.quantity} required />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Descrição (Opcional)</Label>
+              <Textarea name="description" defaultValue={editingTicketType?.description} placeholder="O que está incluso?" />
+            </div>
+            <div className="flex items-center justify-between p-4 bg-muted/20 rounded-lg">
+               <Label className="flex-1 cursor-pointer" htmlFor="active-edit">Ingresso Ativo (Visível no site)</Label>
+               <Switch name="active" id="active-edit" defaultChecked={editingTicketType?.active} />
+            </div>
+            <Button type="submit" disabled={isUpdatingTicketType} className="w-full">
+              {isUpdatingTicketType && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} SALVAR ALTERAÇÕES
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isEditParticipantModalOpen} onOpenChange={setIsEditParticipantModalOpen}>
         <DialogContent>
